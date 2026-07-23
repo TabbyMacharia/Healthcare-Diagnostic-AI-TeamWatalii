@@ -10,6 +10,8 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import classification_report, confusion_matrix
+from typing import List, Dict
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 import matplotlib.pyplot as plt
 import seaborn as sns
 import warnings
@@ -120,7 +122,7 @@ class MLDiagnosticClassifier:
                 'test_acc': test_acc
             }
             if verbose:
-                print(f"\n  🌲 {name}")
+                print(f"\n  Model: {name}")
                 print(f"     CV Accuracy : {cv_scores.mean():.4f} "
                       f"± {cv_scores.std():.4f}")
                 print(f"     Test Accuracy: {test_acc:.4f}")
@@ -135,7 +137,7 @@ class MLDiagnosticClassifier:
         self._y_test = y_test
 
         if verbose:
-            print(f"\n  🏆 Best Model: {self.best_model_name} "
+            print(f"\n  Best Model: {self.best_model_name} "
                   f"({best_acc:.4f})")
         return results
 
@@ -143,6 +145,9 @@ class MLDiagnosticClassifier:
         """Predict disease from symptom list"""
         if not self.is_trained:
             self.train(verbose=False)
+
+        symptoms = [s.lower().strip() for s in symptoms 
+                    if s.lower().strip() in self.SYMPTOM_FEATURES]     
 
         features = np.array([
             [1 if s in symptoms else 0
@@ -179,6 +184,11 @@ class MLDiagnosticClassifier:
             self.train(verbose=False)
 
         y_pred = self.best_model.predict(self._X_test)
+        print(classification_report(
+            self._y_test,
+            y_pred,
+            target_names=self.label_encoder.classes_))
+
         cm     = confusion_matrix(self._y_test, y_pred)
         labels = self.label_encoder.classes_
 
@@ -210,6 +220,12 @@ class MLDiagnosticClassifier:
         plt.suptitle(f"ML Diagnostic Model Evaluation — {self.best_model_name}",
                      fontsize=14, fontweight='bold')
         plt.tight_layout()
-        plt.savefig("ml_evaluation.png", dpi=150, bbox_inches='tight')
-        plt.show()
-        print("✅ Saved: ml_evaluation.png")
+        plt.savefig("ml_evaluation.png", dpi=150, bbox_inches="tight")
+
+        # Display the graph once
+        plt.show(block=True)
+
+        # Close all figure windows after the user closes the graph
+        plt.close("all")
+
+        print("Saved: ml_evaluation.png")
