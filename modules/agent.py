@@ -3,10 +3,15 @@
 # Covers: Week 2 (Intelligent Agents) + PEAS Framework
 # ============================================================
 
+import sys
+import io
 from enum import Enum
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional
 import datetime
+
+# Force UTF-8 output for Windows terminals to support emojis
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 class AgentState(Enum):
     IDLE         = "idle"
@@ -155,28 +160,28 @@ class HealthcareDiagnosticAgent:
     def _generate_recommendations(self, urgency, results):
         base = {
             "CRITICAL": [
-                "🚨 Immediate emergency consultation required",
-                "📞 Alert attending physician now",
-                "🏥 Transfer to emergency ward",
-                "💊 Administer first-line medications"
+                "Immediate emergency consultation required",
+                "Alert attending physician now",
+                "Transfer to emergency ward",
+                "Administer first-line medications"
             ],
             "HIGH": [
-                "⚠️  Schedule urgent appointment within 24 hours",
-                "🧪 Order blood panel and cultures",
-                "💊 Prescribe symptomatic relief",
-                "📋 Monitor vitals every 2 hours"
+                " Schedule urgent appointment within 24 hours",
+                "Order blood panel and cultures",
+                "Prescribe symptomatic relief",
+                "Monitor vitals every 2 hours"
             ],
             "MEDIUM": [
-                "📅 Schedule appointment within 3 days",
-                "💊 Over-the-counter treatment advised",
-                "🌡️  Monitor temperature twice daily",
-                "💧 Increase fluid intake"
+                "Schedule appointment within 3 days",
+                "Over-the-counter treatment advised",
+                "Monitor temperature twice daily",
+                "Increase fluid intake"
             ],
             "LOW": [
-                "🏠 Home rest recommended",
-                "💧 Stay hydrated",
-                "📱 Follow up if symptoms worsen",
-                "📋 General wellness monitoring"
+                "Home rest recommended",
+                "Stay hydrated",
+                "Follow up if symptoms worsen",
+                "General wellness monitoring"
             ]
         }
         return base.get(urgency, base["LOW"])
@@ -195,7 +200,7 @@ class HealthcareDiagnosticAgent:
         self.memory.action_log.append(entry)
 
     def print_log(self):
-        print("\n📋 Agent Action Log:")
+        print("\n Agent Action Log:")
         print("─" * 50)
         for entry in self.memory.action_log:
             print(f"  {entry}")
@@ -206,3 +211,62 @@ class HealthcareDiagnosticAgent:
             'performance_score': self.performance_score,
             'diagnoses_made':    len(self.memory.diagnosis_history)
         }
+
+
+# ============================================================
+# VALIDATION TEST SCRIPT
+# ============================================================
+
+def run_agent_validation():
+    print("--- STARTING AGENT VALIDATION ---")
+    
+    # 1. Instantiate Agent
+    agent = HealthcareDiagnosticAgent()
+    print(f"Initial State: {agent.state.name}")
+    
+    # 2. Test Module Registration
+    class MockBayesianModule:
+        def analyze(self, patient):
+            return {
+                "diagnosis": "Bacterial Infection",
+                "confidence": 0.88,
+                "summary": "High temp and heart rate suggest bacterial origin."
+            }
+            
+    agent.register_module("Bayesian_Network", MockBayesianModule())
+    
+    # 3. Create a Patient Percept
+    test_patient = PatientPercept(
+        patient_id="PT-9942",
+        symptoms=["Severe Headache", "Nausea"],
+        age=34,
+        temperature=38.9,  # Should trigger HIGH urgency
+        heart_rate=95,
+        blood_pressure="130/85"
+    )
+    
+    # 4. Test Perceive()
+    print("\n--- Testing perceive() ---")
+    agent.perceive(test_patient)
+    print(f"State after perceive: {agent.state.name}")
+    print(f"Memory updated: {agent.memory.current_patient.patient_id == 'PT-9942'}")
+    
+    # 5. Test Think()
+    print("\n--- Testing think() ---")
+    results = agent.think()
+    print(f"State after think: {agent.state.name}")
+    print(f"Diagnosis Results: {results}")
+    
+    # 6. Test Act()
+    print("\n--- Testing act() ---")
+    action_report = agent.act(results)
+    print(f"State after act: {agent.state.name}")
+    print(f"Action Report Urgency: {action_report['urgency']}")
+    
+    # 7. Verify Logging and Performance
+    agent.print_log()
+    print("\nPerformance Data:", agent.get_performance())
+
+if __name__ == "__main__":
+    run_agent_validation()
+
