@@ -1,23 +1,9 @@
-# ============================================================
-# MODULE 5: Deep Neural Network Diagnostic Model
-# Covers: Week 10 (Neural Networks)
-# ============================================================
-
 import numpy as np
-from typing import Dict
-print("1. NumPy imported")
-
 import tensorflow as tf
-print("2. TensorFlow imported")
-
 from tensorflow.keras import layers, models, callbacks
-print("3. Keras imported")
-
 import matplotlib.pyplot as plt
-print("4. Matplotlib imported")
-
 from typing import List, Dict
-print("5. Typing imported")
+
 
 class NeuralDiagnosticModel:
     """
@@ -214,3 +200,4 @@ class NeuralDiagnosticModel:
         plt.tight_layout()
         plt.savefig("nn_training.png", dpi=150)
         plt.show()
+# Module completed.
