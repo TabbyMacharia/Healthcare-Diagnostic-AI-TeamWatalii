@@ -1,32 +1,33 @@
 # ============================================================
 # MODULE 3: Bayesian Network — Probabilistic Diagnosis
-# Covers: Week 7 (Bayesian Networks)
+# Covers: Week 7 (Bayesian Networks & Naïve Bayes)
 # ============================================================
 
 import numpy as np
-from typing import Dict, List
+from typing import Dict, List, Any
+
 
 class SimpleBayesianDiagnostics:
     """
-    Simplified Bayesian diagnostic model using
-    pre-computed conditional probabilities.
+    Simplified Bayesian diagnostic model using pre-computed conditional
+    probabilities and Naïve Bayes logic in log space.
     """
 
     def __init__(self):
-        # Prior probabilities P(Disease)
-        self.priors = {
-            'flu':        0.15,
-            'covid19':    0.08,
-            'dengue':     0.05,
-            'cardiac':    0.04,
-            'diabetes':   0.10,
-            'common_cold':0.30,
-            'healthy':    0.28,
+        # Prior probabilities P(Disease) - Base rate in population
+        self.priors: Dict[str, float] = {
+            'flu':         0.15,
+            'covid19':     0.08,
+            'dengue':      0.05,
+            'cardiac':     0.04,
+            'diabetes':    0.10,
+            'common_cold': 0.30,
+            'healthy':     0.28,
         }
 
         # Likelihoods: P(Symptom | Disease)
         # Format: disease -> {symptom -> P(symptom|disease)}
-        self.likelihoods = {
+        self.likelihoods: Dict[str, Dict[str, float]] = {
             'flu': {
                 'fever': 0.90, 'cough': 0.85, 'fatigue': 0.88,
                 'headache': 0.70, 'body_aches': 0.80,
@@ -71,51 +72,89 @@ class SimpleBayesianDiagnostics:
             }
         }
 
-    def compute_posterior(self,
-                          symptoms: List[str]) -> Dict[str, float]:
+    def compute_posterior(self, symptoms: List[str]) -> Dict[str, float]:
         """
-        Naïve Bayes posterior:
-        P(D|S₁,...,Sₙ) ∝ P(D) × ∏ P(Sᵢ|D)
+        Computes Naïve Bayes Posterior Probability:
+        P(D | S1, ..., Sn) ∝ P(D) * ∏ P(Si | D)
+        Uses log-space additions to prevent underflow error.
         """
         posteriors = {}
-        symptoms_clean = [s.lower().replace(' ', '_') for s in symptoms]
+        # Clean string inputs to match lower_snake_case formatting
+        symptoms_clean = [s.lower().strip().replace(' ', '_') for s in symptoms]
 
         for disease, prior in self.priors.items():
+            # Start with log of the prior P(Disease)
             log_prob = np.log(prior)
+            
             for symptom in symptoms_clean:
+                # Use floor value 0.01 for unseen symptoms to avoid log(0) undefined errors
                 p_s_given_d = self.likelihoods[disease].get(symptom, 0.01)
                 log_prob += np.log(p_s_given_d)
+                
             posteriors[disease] = log_prob
 
-        # Convert log-probabilities to probabilities
+        # Softmax conversion: convert log-probabilities back to standard probabilities
         max_log = max(posteriors.values())
-        exp_probs = {d: np.exp(v - max_log)
-                     for d, v in posteriors.items()}
+        exp_probs = {d: np.exp(v - max_log) for d, v in posteriors.items()}
         total = sum(exp_probs.values())
-        return {d: round(v/total, 4) for d, v in exp_probs.items()}
 
-    def analyze(self, percept) -> Dict:
-        """Module interface for the agent"""
-        posteriors = self.compute_posterior(percept.symptoms)
-        top_disease = max(posteriors, key=posteriors.get)
-        top_prob    = posteriors[top_disease]
-        sorted_dx   = sorted(posteriors.items(),
-                             key=lambda x: x[1], reverse=True)
+        # Normalize so all disease probabilities sum to 1.0
+        return {d: round(v / total, 4) for d, v in exp_probs.items()}
+
+    def analyze(self, percept: Any) -> Dict[str, Any]:
+        """
+        Standard agent interface method.
+        Expects a PatientPercept object with a `symptoms` attribute.
+        """
+        symptoms = getattr(percept, 'symptoms', [])
+        posteriors = self.compute_posterior(symptoms)
+
+        # Rank diagnoses by probability score
+        sorted_dx = sorted(posteriors.items(), key=lambda x: x[1], reverse=True)
+        top_disease, top_prob = sorted_dx[0]
 
         return {
-            'summary':    f"Top: {top_disease} ({top_prob:.2%})",
-            'diagnosis':  top_disease,
+            'summary': f"Top: {top_disease} ({top_prob:.2%})",
+            'diagnosis': top_disease,
             'confidence': top_prob,
             'all_posteriors': posteriors,
             'ranked_diagnoses': sorted_dx[:5]
         }
 
     def explain(self, disease: str, symptoms: List[str]) -> str:
-        symptoms_clean = [s.lower().replace(' ','_') for s in symptoms]
-        likelihoods    = self.likelihoods.get(disease, {})
+        """
+        Generates a human-readable mathematical breakdown of the posterior logic.
+        """
+        symptoms_clean = [s.lower().strip().replace(' ', '_') for s in symptoms]
+        likelihoods = self.likelihoods.get(disease, {})
+        
         evidence = [
-            f"P({s}|{disease})={likelihoods.get(s,0.01):.2f}"
+            f"P({s}|{disease})={likelihoods.get(s, 0.01):.2f}"
             for s in symptoms_clean
         ]
-        return f"P({disease}) = {self.priors[disease]} × " + \
-               " × ".join(evidence)
+        
+        prior_val = self.priors.get(disease, 0.0)
+        return f"P({disease}) = {prior_val} × " + " × ".join(evidence)
+
+
+# ============================================================
+# MODULE TESTER / DEMO
+# ============================================================
+if __name__ == "__main__":
+    # Test instance standalone
+    bn = SimpleBayesianDiagnostics()
+    
+    test_symptoms = ["fever", "cough", "loss of smell", "fatigue"]
+    print(f"Testing symptoms: {test_symptoms}\n")
+
+    # 1. Test compute_posterior
+    posteriors = bn.compute_posterior(test_symptoms)
+    print("Ranked Diagnoses:")
+    ranked = sorted(posteriors.items(), key=lambda x: x[1], reverse=True)
+    for disease, prob in ranked:
+        print(f"  • {disease:<15}: {prob:.2%}")
+
+    # 2. Test explanation generator
+    print("\nExplanation breakdown for top disease:")
+    top_disease = ranked[0][0]
+    print(" ", bn.explain(top_disease, test_symptoms))
