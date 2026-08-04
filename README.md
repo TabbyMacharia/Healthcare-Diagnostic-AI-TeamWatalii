@@ -26,24 +26,21 @@ The project combines multiple Artificial Intelligence techniques into a single i
 ## System Overview
 
 ```text
-Patient Input
-      │
-      ▼
-Intelligent Agent (Perceive → Think → Act)
-      │
- ┌────┼───────────────┬───────────────┬─────────────┐
- │    │               │               │             │
- ▼    ▼               ▼               ▼             ▼
-Knowledge Base   Bayesian Net   ML Classifier   Neural Network
-                                              │
-                                              ▼
-                                      Fuzzy Controller
-                                              │
-                                              ▼
-                                      Treatment Planner
-                                              │
-                                              ▼
-                                     Final Diagnosis
+                               Patient Input
+                                      │
+                                      ▼
+                  Intelligent Agent (Perceive → Think → Act)
+                                      │
+ ┌────────────────────┬───────────────┬───────────────┬─────────────┐
+ │                    │               │               │             │
+ ▼                    ▼               ▼               ▼             ▼
+Knowledge Base   Fuzzy Logic    Bayesian Net     ML Classifier   Neural Network
+                                      │
+                                      ▼
+                               Treatment Planner
+                                      │
+                                      ▼
+                                Final Diagnosis
 ```
 
 Each module independently analyzes the patient and returns a diagnosis and confidence score. The Intelligent Agent combines these outputs into a single recommendation.
@@ -76,21 +73,29 @@ Each module independently analyzes the patient and returns a diagnosis and confi
 ## Setup
 
 **1. Clone the repository**
+
+```bash
 git clone https://github.com/TabbyMacharia/Healthcare-Diagnostic-AI-TeamWatalii.git
 
 cd Healthcare-Diagnostic-AI-TeamWatalii
+```
 
 **2. Create and activate a virtual environment**
+```bash
 python -m venv venv
-
+```
 **Windows**
+```bash
 venv\Scripts\activate
+```
 **Mac / Linux**
+```bash
 source venv/bin/activate
-
-**3. Install dependenci**es
+```
+**3. Install dependencies**
+```bash
 pip install -r requirements.txt
-
+```
 
 ## Project Structure
 
