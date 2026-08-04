@@ -23,30 +23,30 @@ The project combines multiple Artificial Intelligence techniques into a single i
 
 
 
-##System Overview
+## System Overview
 
+```text
 Patient Input
       │
       ▼
-Intelligent Agent
-(perceive → think → act)
+Intelligent Agent (Perceive → Think → Act)
       │
- ┌────┴────┐
- │         │
- ▼         ▼
-Knowledge Base
-Bayesian Network
-ML Classifier
-Neural Network
-Fuzzy Controller
-      │
-      ▼
-Treatment Planner
-      │
-      ▼
-Final Diagnosis
+ ┌────┼───────────────┬───────────────┬─────────────┐
+ │    │               │               │             │
+ ▼    ▼               ▼               ▼             ▼
+Knowledge Base   Bayesian Net   ML Classifier   Neural Network
+                                              │
+                                              ▼
+                                      Fuzzy Controller
+                                              │
+                                              ▼
+                                      Treatment Planner
+                                              │
+                                              ▼
+                                     Final Diagnosis
+```
 
-Each module independently analyzes the patient and returns a diagnosis + confidence score. The Agent combines all module outputs into a single recommendation.
+Each module independently analyzes the patient and returns a diagnosis and confidence score. The Intelligent Agent combines these outputs into a single recommendation.
 
 
 ## Features
@@ -94,6 +94,7 @@ pip install -r requirements.txt
 
 ## Project Structure
 
+```text
 .
 ├── modules/
 │   ├── agent.py
@@ -113,12 +114,16 @@ pip install -r requirements.txt
 ├── naive bayes example
 ├── README.md
 └── .gitignore
+```
 
 
 ## Running the System
 Run the full end-to-end system
-python app.py
 
+```bash
+
+python app.py
+```
 
 ## Evaluation Results
 
@@ -131,21 +136,38 @@ python app.py
 
 
 ## Development Workflow
-We've set up a branch-based workflow specifically to protect main.
 
-**Update local main**
+We've set up a branch-based workflow to protect the `main` branch.
+
+### 1. Update your local main branch
+
+```bash
 git checkout main
 git pull origin main
+```
 
-**Create a feature branch**
+### 2. Create a feature branch
+
+```bash
 git checkout -b yourname/feature-name
+```
 
-**Make your changes**
+### 3. Make your changes
+
+```bash
 git add .
 git commit -m "Describe your changes"
+```
 
-**Push your branch**
+### 4. Push your branch
+
+```bash
 git push origin yourname/feature-name
+```
+
+### 5. Open a Pull Request
+
+After pushing your branch, create a Pull Request on GitHub. Once reviewed and approved by the Team Lead, your changes will be merged into `main`.
 
 
 ## License
