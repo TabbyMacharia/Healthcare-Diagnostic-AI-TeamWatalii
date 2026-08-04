@@ -1,8 +1,3 @@
-# ============================================================
-# MODULE 7: AI Planning — Treatment Plan Generator
-# Covers: Week 12 (AI Planning Techniques)
-# ============================================================
-
 from copy import deepcopy
 from collections import deque
 from typing import Dict, List, Set, Tuple, Optional
@@ -47,7 +42,7 @@ class TreatmentPlanner:
                 'name': 'ReceiveBloodResults',
                 'precond': {'BLOOD_RESULTS_PENDING'},
                 'delete':  {'BLOOD_RESULTS_PENDING'},
-                'add':     {'BLOOD_RESULTS_AVAILABLE', 'DIAGNOSIS_REFINED'},
+                'add': {'BLOOD_RESULTS_AVAILABLE','DIAGNOSIS_REFINED','DIAGNOSIS_CONFIRMED'},
                 'cost': 0, 'duration': '2 hours'
             },
             {
@@ -113,6 +108,14 @@ class TreatmentPlanner:
                 'delete':  {'PLAN_COMPLETE'},
                 'add':     {'PATIENT_DISCHARGED'},
                 'cost': 0, 'duration': '30 minutes'
+            },
+            {
+               'name': 'StabilizeCardiacPatient',
+               'precond': {'PATIENT_IN_ICU'},
+               'delete': set(),
+               'add': {'TREATMENT_STARTED'},
+               'cost': 0,
+               'duration': '20 minutes'
             },
         ]
 

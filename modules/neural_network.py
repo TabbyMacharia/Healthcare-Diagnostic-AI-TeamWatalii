@@ -4,9 +4,20 @@
 # ============================================================
 
 import numpy as np
+from typing import Dict
+print("1. NumPy imported")
+
 import tensorflow as tf
+print("2. TensorFlow imported")
+
 from tensorflow.keras import layers, models, callbacks
+print("3. Keras imported")
+
 import matplotlib.pyplot as plt
+print("4. Matplotlib imported")
+
+from typing import List, Dict
+print("5. Typing imported")
 
 class NeuralDiagnosticModel:
     """
@@ -70,7 +81,6 @@ class NeuralDiagnosticModel:
 
     def _generate_data(self, n: int = 3000):
         """Generate synthetic training data"""
-        from sklearn.preprocessing import LabelEncoder
         np.random.seed(42)
 
         profiles = {
