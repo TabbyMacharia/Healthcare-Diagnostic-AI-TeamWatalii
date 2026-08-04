@@ -25,16 +25,26 @@ The project combines multiple Artificial Intelligence techniques into a single i
 
 ##System Overview
 
-Patient Input → Intelligent Agent (perceive → think → act)
-                        │
-     ┌──────────┬───────┼────────┬──────────┐
-Knowledge   Bayesian   ML      Neural     Fuzzy
-  Base       Network  Classifier Network  Severity
-     └──────────┴───────┼────────┴──────────┘
-                 AI Treatment Planner
-                        │
-                  Final Output Report
-     (Diagnosis, Confidence Score, Urgency, Treatment Plan)
+Patient Input
+      │
+      ▼
+Intelligent Agent
+(perceive → think → act)
+      │
+ ┌────┴────┐
+ │         │
+ ▼         ▼
+Knowledge Base
+Bayesian Network
+ML Classifier
+Neural Network
+Fuzzy Controller
+      │
+      ▼
+Treatment Planner
+      │
+      ▼
+Final Diagnosis
 
 Each module independently analyzes the patient and returns a diagnosis + confidence score. The Agent combines all module outputs into a single recommendation.
 
@@ -52,7 +62,7 @@ Each module independently analyzes the patient and returns a diagnosis + confide
 - Unified diagnosis from multiple AI models
 
 
-##Technologies Used 
+## Technologies Used
 
 - Python
 - NumPy
@@ -63,52 +73,54 @@ Each module independently analyzes the patient and returns a diagnosis + confide
 - Git
 - GitHub
 
-##Setup
+## Setup
 
-# 1. Clone the repository
+**1. Clone the repository**
 git clone https://github.com/TabbyMacharia/Healthcare-Diagnostic-AI-TeamWatalii.git
+
 cd Healthcare-Diagnostic-AI-TeamWatalii
 
-# 2. Create and activate a virtual environment
+**2. Create and activate a virtual environment**
 python -m venv venv
 
-# Windows
+**Windows**
 venv\Scripts\activate
-# Mac / Linux
+**Mac / Linux**
 source venv/bin/activate
 
-# 3. Install dependencies
+**3. Install dependenci**es
 pip install -r requirements.txt
 
 
-##Project Structure
+## Project Structure
 
+.
 ├── modules/
-│   ├── agent.py              
-|   ├── bayesian_net.py       
-│   ├── fuzzy_controller.py   
-│   ├── knowledge_base.py     
-│   ├── ml_classifier.py      
-│   ├── neural_network.py     
-│   ├── planner.py            
-│   └──test_ml_classifier.py  
+│   ├── agent.py
+│   ├── bayesian_net.py
+│   ├── fuzzy_controller.py
+│   ├── knowledge_base.py
+│   ├── ml_classifier.py
+│   ├── neural_network.py
+│   ├── planner.py
+│   └── test_ml_classifier.py
 ├── reports/
 │   └── final_report.pdf
-├── app.py                    # Main application entry point
+├── app.py
 ├── requirements.txt
-├──Environment Setup
-├──Kmeans_example_unsupervised_learning_learning_lab_work.ipynb
-├──naive bayes example
+├── Environment Setup
+├── Kmeans_example_unsupervised_learning_learning_lab_work.ipynb
+├── naive bayes example
 ├── README.md
-└──.gitignore
+└── .gitignore
 
 
-##Running the System
-# Run the full end-to-end system
+## Running the System
+Run the full end-to-end system
 python app.py
 
 
-##Evaluation Results
+## Evaluation Results
 
 | Model | Accuracy | Precision | Recall | F1-Score |
 |--------|----------|-----------|--------|----------|
@@ -118,25 +130,25 @@ python app.py
 | Neural Network | Pending | Pending | Pending | Pending |
 
 
-##Development Workflow
+## Development Workflow
 We've set up a branch-based workflow specifically to protect main.
 
-# Update local main
+**Update local main**
 git checkout main
 git pull origin main
 
-# Create a feature branch
+**Create a feature branch**
 git checkout -b yourname/feature-name
 
-# Make your changes
+**Make your changes**
 git add .
 git commit -m "Describe your changes"
 
-# Push your branch
+**Push your branch**
 git push origin yourname/feature-name
 
 
-##License
+## License
 This project was developed for academic purposes as part of the Artificial Intelligence Capstone Project at Dedan Kimathi University of Technology.
 
 
