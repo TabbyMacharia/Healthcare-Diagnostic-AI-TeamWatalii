@@ -159,3 +159,69 @@ class MedicalKnowledgeBase:
                 return (f"'{diagnosis}' derived from: "
                         f"{' + '.join(conditions)} (CF={cf})")
         return f"'{diagnosis}' is a base fact"
+
+
+# ============================================================
+# VALIDATION TEST SCRIPT FOR KNOWLEDGE BASE
+# ============================================================
+import sys
+import io
+from dataclasses import dataclass
+
+# Force UTF-8 encoding for Windows terminals to support symbols like checkmarks
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
+# Mocking the PatientPercept from agent.py for standalone testing
+@dataclass
+class MockPatientPercept:
+    patient_id: str
+    symptoms: list
+    temperature: float
+    heart_rate: int
+
+def run_kb_validation():
+    print("--- STARTING KNOWLEDGE BASE VALIDATION ---")
+    
+    kb = MedicalKnowledgeBase()
+    
+    # 1. Test Fact Loading & Base Rules
+    print("\n[✓] 1. Testing Fact Loading...")
+    kb.load_patient_symptoms(["cough", "fatigue", "loss of smell"])
+    kb.add_fact("fever", 0.9) # Adding fever manually with a certainty factor
+    print(f"Facts successfully loaded: {kb.facts}")
+    
+    # 2. Test Forward Chaining (Data-Driven)
+    print("\n[✓] 2. Testing Forward Chaining (Verbose)...")
+    inferred = kb.forward_chain(verbose=True)
+    print(f"\nFinal Inferred Conclusions: {inferred}")
+    
+    # 3. Test Backward Chaining (Goal-Driven)
+    print("\n[✓] 3. Testing Backward Chaining...")
+    # Checking if the system can prove a specific goal working backwards
+    proved_covid, cf_covid = kb.backward_chain("covid19_suspected")
+    print(f"Goal 'covid19_suspected' proven? {proved_covid} (CF: {cf_covid})")
+    
+    # Checking a false goal
+    proved_dengue, cf_dengue = kb.backward_chain("dengue_suspected")
+    print(f"Goal 'dengue_suspected' proven? {proved_dengue} (CF: {cf_dengue})")
+    
+    # 4. Test Explanations
+    print("\n[✓] 4. Testing Diagnosis Explanations...")
+    explanation = kb.get_explanation("covid19_suspected")
+    print(f"Explanation Engine Output: {explanation}")
+    
+    # 5. Test Integration with Agent (analyze method)
+    print("\n[✓] 5. Testing Agent Interface (analyze method)...")
+    # This patient data should trigger the meningitis rule
+    test_patient = MockPatientPercept(
+        patient_id="PT-123",
+        symptoms=["headache", "stiff_neck", "light_sensitivity"],
+        temperature=39.8, # This will automatically add 'fever' and 'high_fever' facts
+        heart_rate=105    # This adds 'tachycardia'
+    )
+    
+    agent_result = kb.analyze(test_patient)
+    print(f"Analyze Method Result:\n{agent_result}")
+
+if __name__ == "__main__":
+    run_kb_validation()
