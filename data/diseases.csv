@@ -1,0 +1,11 @@
+DiseaseID,Disease,Severity
+D001,Common Cold,Low
+D002,Influenza,Medium
+D003,COVID-19,High
+D004,Pneumonia,High
+D005,Malaria,High
+D006,Typhoid,High
+D007,Migraine,Medium
+D008,Hypertension,Medium
+D009,Food Poisoning,Medium
+D010,Healthy,Low
