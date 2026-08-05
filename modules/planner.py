@@ -1,6 +1,5 @@
-from copy import deepcopy
 from collections import deque
-from typing import Dict, List, Set, Tuple, Optional
+from typing import Dict, List, Set, Optional
 
 class TreatmentPlanner:
     """
@@ -9,8 +8,43 @@ class TreatmentPlanner:
     from patient diagnosis to recovery.
     """
 
-    def __init__(self):
-        self.action_library = self._build_action_library()
+def __init__(self):
+    self.action_library = self._build_action_library()
+
+    self.diagnosis_states = {
+        'flu': {'VIRAL_INFECTION', 'DIAGNOSIS_NEEDED'},
+        'covid19': {
+            'COVID_SUSPECTED',
+            'CONTAGIOUS_DISEASE',
+            'DIAGNOSIS_NEEDED'
+        },
+        'cardiac_event': {
+            'EMERGENCY_CASE',
+            'ICU_AVAILABLE'
+        },
+        'dengue': {
+            'VIRAL_INFECTION',
+            'DIAGNOSIS_NEEDED',
+            'DEHYDRATION_RISK'
+        },
+        'meningitis': {
+            'EMERGENCY_CASE',
+            'BACTERIAL_INFECTION',
+            'ICU_AVAILABLE'
+        },
+        'tuberculosis': {
+            'BACTERIAL_INFECTION',
+            'CONTAGIOUS_DISEASE',
+            'DIAGNOSIS_NEEDED'
+        },
+        'diabetes': {
+            'DIAGNOSIS_NEEDED'
+        },
+        'common_cold': {
+            'VIRAL_INFECTION',
+            'DIAGNOSIS_NEEDED'
+        }
+    }
 
     def _build_action_library(self) -> List[Dict]:
         """Define medical treatment actions"""
@@ -205,15 +239,67 @@ class TreatmentPlanner:
         }
 
     def _estimate_duration(self, plan: List[Dict]) -> str:
-        durations = [a['duration'] for a in plan]
-        return f"{len(plan)} actions | see individual durations"
+        """
+        Estimate the total duration of a treatment plan.
+        Fixed-time actions are summed, while long-running
+        activities (e.g. Continuous, 14 days) are listed separately.
+        """
+
+        total_minutes = 0
+        special = []
+
+        for action in plan:
+            duration = action["duration"]
+
+            if duration == "Continuous":
+                special.append("Continuous monitoring")
+
+            elif "day" in duration:
+                special.append(duration)
+
+            elif "hour" in duration:
+                value = int(duration.split()[0])
+                total_minutes += value * 60
+
+            elif "minute" in duration:
+                value = int(duration.split()[0])
+                total_minutes += value
+
+        hours = total_minutes // 60
+        minutes = total_minutes % 60
+
+        summary = []
+
+        if hours:
+            summary.append(f"{hours} hr")
+
+        if minutes:
+            summary.append(f"{minutes} min")
+
+        if special:
+            summary.extend(special)
+
+        return ", ".join(summary)
 
     def analyze(self, percept) -> Dict:
-        """Module interface — generates a sample plan"""
-        # This is called post-diagnosis; use KB result
-        result = self.create_treatment_plan('flu', 'MEDIUM')
-        result['summary']    = f"Plan: {result['steps']} steps generated"
-        result['diagnosis']  = 'flu'
-        result['confidence'] = 0.7
+        """
+        Module interface.
+        Generates a treatment plan using the diagnosis
+        and urgency provided by previous AI modules.
+        """
+
+        diagnosis = getattr(percept, "diagnosis", "flu")
+        urgency = getattr(percept, "urgency", "MEDIUM")
+        confidence = getattr(percept, "confidence", 1.0)
+
+        result = self.create_treatment_plan(diagnosis, urgency)
+
+        if "error" not in result:
+            result["summary"] = (
+                f"Treatment plan generated for {diagnosis} "
+                f"({urgency})"
+            )
+            result["confidence"] = confidence
+
         return result
 # Module completed.
