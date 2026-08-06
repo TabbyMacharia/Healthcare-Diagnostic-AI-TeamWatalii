@@ -1,8 +1,10 @@
 # ============================================================
 # MODULE 4: ML Classifier — Supervised Diagnosis
 # Covers: Week 9 (Supervised Learning & Decision Trees)
+# Trained on data/patient_records.csv (real project dataset)
 # ============================================================
 
+import os
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
@@ -11,31 +13,60 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import classification_report, confusion_matrix
 from typing import List, Dict
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 import matplotlib.pyplot as plt
 import seaborn as sns
 import warnings
 warnings.filterwarnings('ignore')
+
+
+def find_data_file(filename: str) -> str:
+    """Locate a data/ CSV whether this module is run from the project
+    root, from inside modules/, or imported as a package. Tries the
+    project layout from the lab manual (data/ as a sibling of modules/)
+    first, then falls back to a few common alternatives."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(here, "..", "data", filename),
+        os.path.join(here, "data", filename),
+        os.path.join("data", filename),
+        filename,
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            return c
+    raise FileNotFoundError(
+        f"Could not find '{filename}'. Expected it inside a data/ folder "
+        f"next to modules/ (see the lab manual's project structure)."
+    )
+
 
 class MLDiagnosticClassifier:
     """
     Ensemble ML-based diagnostic classifier.
     Uses Decision Trees, Random Forest, and
     Gradient Boosting for robust diagnosis.
+
+    Trains directly on data/patient_records.csv rather than synthetic
+    data — SYMPTOM_FEATURES and DISEASE_LABELS are populated from the
+    CSV's actual columns and Diagnosis values the first time train()
+    or predict() is called.
     """
 
+    # Populated dynamically from the CSV in _load_data(); kept as class
+    # defaults so other code (e.g. predict() before training) has sane
+    # fallbacks that match data/patient_records.csv's real columns.
     SYMPTOM_FEATURES = [
-        'fever', 'cough', 'fatigue', 'headache',
-        'body_aches', 'loss_of_smell', 'chest_pain',
-        'rash', 'joint_pain', 'shortness_of_breath',
-        'sweating', 'frequent_urination', 'excessive_thirst',
-        'blurred_vision', 'night_sweats', 'weight_loss',
-        'stiff_neck', 'light_sensitivity'
+        'fever', 'cough', 'headache', 'fatigue', 'sore_throat',
+        'chest_pain', 'shortness_of_breath', 'nausea', 'vomiting',
+        'diarrhea', 'body_ache', 'runny_nose', 'sneezing',
+        'loss_of_taste', 'loss_of_smell', 'chills', 'dizziness',
+        'high_blood_pressure', 'low_blood_pressure', 'high_heart_rate'
     ]
 
     DISEASE_LABELS = [
-        'flu', 'covid19', 'dengue', 'cardiac_event',
-        'diabetes', 'common_cold', 'tuberculosis', 'meningitis'
+        'COVID-19', 'Common Cold', 'Food Poisoning', 'Healthy',
+        'Hypertension', 'Influenza', 'Malaria', 'Migraine',
+        'Pneumonia', 'Typhoid'
     ]
 
     def __init__(self):
@@ -51,58 +82,58 @@ class MLDiagnosticClassifier:
         self.best_model_name = None
         self.label_encoder = LabelEncoder()
         self.is_trained    = False
+        self._features_set = False
 
-    def _generate_synthetic_data(self, n_samples: int = 2000) -> pd.DataFrame:
-        """Generate realistic synthetic medical dataset"""
-        np.random.seed(42)
-        records = []
+    def _load_data(self) -> pd.DataFrame:
+        """Load the real project dataset from data/patient_records.csv.
 
-        # Disease profiles: P(symptom | disease)
-        profiles = {
-            'flu':           {'fever':0.90,'cough':0.85,'fatigue':0.88,
-                              'headache':0.70,'body_aches':0.80,'loss_of_smell':0.20},
-            'covid19':       {'fever':0.88,'cough':0.80,'fatigue':0.90,
-                              'loss_of_smell':0.85,'headache':0.65,'body_aches':0.60},
-            'dengue':        {'fever':0.98,'rash':0.75,'joint_pain':0.85,
-                              'headache':0.90,'fatigue':0.80,'body_aches':0.88},
-            'cardiac_event': {'chest_pain':0.92,'shortness_of_breath':0.88,
-                              'fatigue':0.70,'sweating':0.75,'headache':0.30},
-            'diabetes':      {'fatigue':0.82,'frequent_urination':0.95,
-                              'excessive_thirst':0.92,'blurred_vision':0.70,
-                              'weight_loss':0.50},
-            'common_cold':   {'cough':0.90,'fever':0.50,'headache':0.60,
-                              'fatigue':0.55,'body_aches':0.50},
-            'tuberculosis':  {'cough':0.95,'weight_loss':0.85,'night_sweats':0.80,
-                              'fatigue':0.88,'fever':0.70},
-            'meningitis':    {'headache':0.95,'stiff_neck':0.90,'fever':0.92,
-                              'light_sensitivity':0.85,'fatigue':0.80},
-        }
+        The CSV's symptom columns are Title_Case (e.g. 'Sore_Throat');
+        SYMPTOM_FEATURES/predict() use lower_snake_case, matching the
+        symptom-cleaning convention used everywhere else in this project
+        ("Loss of Smell" -> "loss_of_smell"). We lowercase the columns
+        here so both sides agree.
+        """
+        path = find_data_file("patient_records.csv")
+        df = pd.read_csv(path)
+        df.columns = [c.strip() for c in df.columns]
 
-        n_per_class = n_samples // len(profiles)
-        for disease, symptom_probs in profiles.items():
-            for _ in range(n_per_class):
-                record = {f: 0 for f in self.SYMPTOM_FEATURES}
-                for symptom, prob in symptom_probs.items():
-                    if symptom in record:
-                        record[symptom] = int(np.random.random() < prob)
-                # Add some noise
-                for feat in self.SYMPTOM_FEATURES:
-                    if record[feat] == 0 and np.random.random() < 0.05:
-                        record[feat] = 1
-                record['disease'] = disease
-                records.append(record)
+        symptom_cols = [c for c in df.columns if c not in ("Diagnosis", "Severity")]
+        self.SYMPTOM_FEATURES = [c.lower() for c in symptom_cols]
+        self.DISEASE_LABELS = sorted(df["Diagnosis"].unique().tolist())
+        self._features_set = True
 
-        df = pd.DataFrame(records).sample(frac=1, random_state=42)
+        # Rename to lower_snake_case so downstream code (predict(), etc.)
+        # can index columns by the same names used in SYMPTOM_FEATURES.
+        df = df.rename(columns={c: c.lower() for c in symptom_cols})
         return df
 
-    def train(self, verbose: bool = True) -> Dict:
-        """Train all models and select the best one"""
-        df = self._generate_synthetic_data(2000)
-        X  = df[self.SYMPTOM_FEATURES].values
-        y  = self.label_encoder.fit_transform(df['disease'])
+    def train(self, verbose: bool = True,
+              X_train=None, X_test=None, y_train=None, y_test=None) -> Dict:
+        """Train all models and select the best one.
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42, stratify=y)
+        By default, loads data/patient_records.csv and makes its own
+        80/20 split (the standalone, per-module-testing use case the lab
+        manual describes). Optionally, pass a pre-made X_train/X_test/
+        y_train/y_test (raw symptom arrays + raw Diagnosis strings) —
+        used by evaluation/metrics.py so ML classifier, Neural Network,
+        Bayesian Net and Knowledge Base can all be scored on the exact
+        same held-out patients for a fair module comparison.
+        """
+        if X_train is None:
+            df = self._load_data()
+            X = df[self.SYMPTOM_FEATURES].values
+            y_raw = df["Diagnosis"].values
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y_raw, test_size=0.2, random_state=42, stratify=y_raw)
+        else:
+            # SYMPTOM_FEATURES/DISEASE_LABELS still need to be correct
+            # even when we skip _load_data() — pull them once so
+            # predict() and plot_evaluation() work normally afterwards.
+            if not hasattr(self, "_features_set") or not self._features_set:
+                self._load_data()
+
+        y_train_enc = self.label_encoder.fit_transform(y_train)
+        y_test_enc  = self.label_encoder.transform(y_test)
 
         results = {}
         best_acc = 0.0
@@ -113,9 +144,12 @@ class MLDiagnosticClassifier:
             print("=" * 55)
 
         for name, model in self.models.items():
-            model.fit(X_train, y_train)
-            cv_scores = cross_val_score(model, X, y, cv=5, scoring='accuracy')
-            test_acc  = model.score(X_test, y_test)
+            model.fit(X_train, y_train_enc)
+            # Cross-validate on the TRAIN fold only — using the full
+            # X/y here (as the original code did) would leak the held-out
+            # test patients into cross-validation.
+            cv_scores = cross_val_score(model, X_train, y_train_enc, cv=5, scoring='accuracy')
+            test_acc  = model.score(X_test, y_test_enc)
             results[name] = {
                 'cv_mean': cv_scores.mean(),
                 'cv_std':  cv_scores.std(),
@@ -134,7 +168,7 @@ class MLDiagnosticClassifier:
 
         self.is_trained = True
         self._X_test = X_test
-        self._y_test = y_test
+        self._y_test = y_test_enc
 
         if verbose:
             print(f"\n  Best Model: {self.best_model_name} "
@@ -146,8 +180,8 @@ class MLDiagnosticClassifier:
         if not self.is_trained:
             self.train(verbose=False)
 
-        symptoms = [s.lower().strip() for s in symptoms 
-                    if s.lower().strip() in self.SYMPTOM_FEATURES]     
+        symptoms = [s.lower().strip() for s in symptoms
+                    if s.lower().strip() in self.SYMPTOM_FEATURES]
 
         features = np.array([
             [1 if s in symptoms else 0
@@ -166,6 +200,7 @@ class MLDiagnosticClassifier:
             'diagnosis':      disease,
             'confidence':     round(float(pred_proba[pred_encoded]), 4),
             'top5':           top5,
+            'all_probs':      {k: round(float(v), 4) for k, v in prob_map.items()},
             'model_used':     self.best_model_name,
             'symptom_vector': features[0].tolist()
         }
