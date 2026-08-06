@@ -8,15 +8,6 @@ from enum import Enum
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional
 import datetime
-
-# Force UTF-8 output for Windows terminals to support emojis.
-# NOTE: the previous version did
-#   sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-# which crashes with "I/O operation on closed file" whenever stdout isn't
-# a plain buffered stream (piped output, Jupyter, some IDEs, or simply
-# importing this module a second time in the same process). reconfigure()
-# is the standard, safe way to do the same thing in Python 3.7+, and it
-# no-ops safely if stdout doesn't support it (e.g. some redirected streams).
 try:
     sys.stdout.reconfigure(encoding='utf-8')
 except (AttributeError, ValueError):
@@ -81,7 +72,37 @@ class HealthcareDiagnosticAgent:
         print(f"  🔌 Module registered: [{name}]")
 
     def perceive(self, percept: PatientPercept):
-        """Step 1: Perceive the environment"""
+        """Step 1: Perceive the environment
+
+        This also derives extra symptom evidence from raw vitals (e.g. a
+        high temperature implies "fever" even if the person never typed
+        that word into the symptoms field) and folds it into
+        percept.symptoms — BEFORE any module sees this patient.
+
+        Bug this fixes: previously, only knowledge_base.py's analyze()
+        looked at percept.temperature/heart_rate directly; bayesian_net.py,
+        ml_classifier.py, and neural_network.py only ever saw the literal
+        symptom list typed in. A patient with temperature=45 (a medical
+        emergency) but who only typed "fatigue, headache" was therefore
+        invisible-as-feverish to 3 of the 4 diagnostic modules, which then
+        guessed diseases from two vague symptoms alone and could land on
+        "Healthy" — directly contradicting the CRITICAL urgency the vitals
+        alone should imply. Deriving shared evidence once here, in
+        perceive() (the Agent's actual "Sensors" step per the PEAS
+        framework), is the correct architectural fix: every module now
+        reasons over the same evidence instead of KB quietly knowing
+        something the others don't.
+        """
+        symptoms = list(percept.symptoms)
+        known = {s.lower().strip().replace(' ', '_') for s in symptoms}
+
+        if percept.temperature >= 38.0 and 'fever' not in known:
+            symptoms.append('fever')
+        if percept.heart_rate >= 100 and 'high_heart_rate' not in known:
+            symptoms.append('high_heart_rate')
+
+        percept.symptoms = symptoms
+
         self.memory.current_patient = percept
         self.memory.patient_history.append({
             'id': percept.patient_id,
