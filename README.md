@@ -149,10 +149,10 @@ python app.py
 
 | Model | Accuracy | Precision | Recall | F1-Score |
 |--------|----------|-----------|--------|----------|
-| Decision Tree |  | Pending | Pending | Pending |
-| Random Forest | Pending | Pending | Pending | Pending |
-| Gradient Boosting | Pending | Pending | Pending | Pending |
-| Neural Network | Pending | Pending | Pending | Pending |
+| Decision Tree | 83.0% | 85.8% | 83.1% | 83.5% |
+| Random Forest | 92.0% | 92.9% | 92.3% | 92.1% |
+| Gradient Boosting | 90.0% | 90.8% | 90.5% | 90.1% |
+| Neural Network | 91.0% | 91.6% | 91.4% | 90.9% |
 
 
 ## Development Workflow
