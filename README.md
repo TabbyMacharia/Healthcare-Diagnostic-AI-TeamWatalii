@@ -126,7 +126,7 @@ pip install -r requirements.txt
 │   ├── confusion_matrix_NeuralNetwork.png
 │   ├── module_comparison.png
 │   ├── roc_curves.png
-│   └── final_report.pdf
+│   └── AI CAPSTONE PROJECT REPORT.pdf
 ├── app.py
 ├── requirements.txt
 ├── Environment Setup
