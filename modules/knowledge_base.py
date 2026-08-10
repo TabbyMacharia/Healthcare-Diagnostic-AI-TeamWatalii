@@ -16,7 +16,6 @@ class MedicalKnowledgeBase:
 
     def __init__(self):
         self.facts: Set[str] = set()
-<<<<<<< HEAD
         self.rules: List[Tuple[List[str], str, float]] = []
         self.certainty_factors: Dict[str, float] = {}
         self._load_medical_knowledge()
@@ -40,68 +39,6 @@ class MedicalKnowledgeBase:
             (["meningitis_suspected"], "EMERGENCY", 0.95),
             (["covid19_confirmed"], "ISOLATE_AND_TREAT", 0.99),
             (["flu_confirmed"], "REST_AND_MEDICATE", 0.90),
-=======
-        self.rules: List[Tuple] = []
-        self.certainty_factors: Dict[str, float] = {}
-        self._load_medical_knowledge()
-
-    # Maps this KB's internal "_suspected" conclusions to the exact
-    # disease-name strings used in data/patient_records.csv (and by
-    # ml_classifier.py / neural_network.py / bayesian_net.py). Without
-    # this mapping, the Agent's cross-module vote in _aggregate_diagnosis()
-    # would never match "covid19_suspected" against "COVID-19" — they'd
-    # look like two different diagnoses instead of the same one.
-    SUSPECT_TO_DISEASE = {
-        "covid19_suspected": "COVID-19",
-        "common_cold_suspected": "Common Cold",
-        "food_poisoning_suspected": "Food Poisoning",
-        "hypertension_suspected": "Hypertension",
-        "influenza_suspected": "Influenza",
-        "malaria_suspected": "Malaria",
-        "migraine_suspected": "Migraine",
-        "pneumonia_suspected": "Pneumonia",
-        "typhoid_suspected": "Typhoid",
-    }
-
-    def _load_medical_knowledge(self):
-        """Load domain medical knowledge.
-
-        Rules are written from the symptom patterns actually present in
-        data/patient_records.csv (e.g. COVID-19 patients in that dataset
-        show loss_of_smell/loss_of_taste ~80-98% of the time; Influenza
-        and Malaria share fever/fatigue/body_ache/chills but Influenza
-        also carries a cough while Malaria mostly doesn't).
-        """
-        # ── Symptom Facts (loaded dynamically per patient) ──
-        # ── Disease Rules ──
-        disease_rules = [
-            # (conditions,                                          conclusion,                 certainty)
-            (["cough", "shortness_of_breath", "loss_of_smell", "loss_of_taste"],
-             "covid19_suspected", 0.90),
-            (["sore_throat", "runny_nose", "sneezing", "cough"],
-             "common_cold_suspected", 0.85),
-            (["nausea", "vomiting", "diarrhea"],
-             "food_poisoning_suspected", 0.88),
-            (["headache", "dizziness", "high_blood_pressure"],
-             "hypertension_suspected", 0.90),
-            (["fever", "cough", "fatigue", "body_ache", "chills"],
-             "influenza_suspected", 0.82),
-            (["fever", "headache", "fatigue", "body_ache", "chills"],
-             "malaria_suspected", 0.80),
-            (["headache", "nausea", "dizziness"],
-             "migraine_suspected", 0.85),
-            (["fever", "cough", "chest_pain", "shortness_of_breath"],
-             "pneumonia_suspected", 0.90),
-            (["fever", "headache", "fatigue", "nausea", "diarrhea"],
-             "typhoid_suspected", 0.85),
-            # Urgency escalation rules
-            (["pneumonia_suspected"],
-             "URGENT_CARE", 0.90),
-            (["covid19_suspected"],
-             "ISOLATE_AND_TREAT", 0.90),
-            (["hypertension_suspected"],
-             "MONITOR_BP", 0.85),
->>>>>>> tabby/project-setup
         ]
         for conditions, conclusion, cf in disease_rules:
             self.add_rule(conditions, conclusion, cf)
@@ -140,12 +77,7 @@ class MedicalKnowledgeBase:
                 )
                 if all_known and conclusion not in inferred:
                     cond_cfs = [
-<<<<<<< HEAD
                         self.certainty_factors.get(c, inferred.get(c, 1.0))
-=======
-                        self.certainty_factors.get(c,
-                                                   inferred.get(c, 1.0))
->>>>>>> tabby/project-setup
                         for c in conditions
                     ]
                     combined_cf = rule_cf * min(cond_cfs)
@@ -157,19 +89,11 @@ class MedicalKnowledgeBase:
                     changed = True
         return inferred
 
-<<<<<<< HEAD
     def backward_chain(
         self, goal: str, visited: Optional[Set[str]] = None, depth: int = 0
     ) -> Tuple[bool, float]:
         """Backward chaining algorithm to verify specific diagnostic goals."""
         clean_goal = goal.strip().lower().replace(' ', '_') if goal not in ["EMERGENCY", "ISOLATE_AND_TREAT", "REST_AND_MEDICATE"] else goal
-=======
-    def backward_chain(self, goal: str,
-                       visited: Optional[Set] = None,
-                       depth: int = 0) -> Tuple[bool, float]:
-        """Backward chaining — prove a goal"""
-        indent = "  " * depth
->>>>>>> tabby/project-setup
         visited = visited or set()
 
         if clean_goal in self.facts:
@@ -202,50 +126,23 @@ class MedicalKnowledgeBase:
         self.load_patient_symptoms(symptoms)
 
         # Add vitals as facts
-<<<<<<< HEAD
         if temp > 38.0:
             self.add_fact("fever", min(1.0, (temp - 37.0) / 3.0))
         if temp > 39.5:
-=======
-        if percept.temperature > 38.0:
-            self.add_fact("fever",
-                          min(1.0, (percept.temperature - 37.0) / 3.0))
-        if percept.temperature > 39.5:
->>>>>>> tabby/project-setup
             self.add_fact("high_fever", 1.0)
         if heart_rate > 100:
             self.add_fact("tachycardia", 1.0)
 
         inferred = self.forward_chain()
-<<<<<<< HEAD
         diseases = {
             k: v for k, v in inferred.items()
             if 'suspected' in k or 'confirmed' in k
         }
-=======
-        diseases = {k: v for k, v in inferred.items()
-                    if k in self.SUSPECT_TO_DISEASE}
-
-        if diseases:
-            top_suspect = max(diseases, key=diseases.get)
-            top_disease = self.SUSPECT_TO_DISEASE[top_suspect]
-            confidence = diseases[top_suspect]
-        else:
-            # No disease rule fired — nothing here suggests illness
-            top_disease = "Healthy"
-            confidence = 0.5
->>>>>>> tabby/project-setup
 
         return {
-<<<<<<< HEAD
             'summary': f"Inferred {len(inferred)} conclusions",
             'diagnosis': top,
             'confidence': diseases.get(top, 0.5),
-=======
-            'summary': f"Inferred {len(inferred)} conclusions -> {top_disease}",
-            'diagnosis': top_disease,
-            'confidence': confidence,
->>>>>>> tabby/project-setup
             'all_inferred': inferred
         }
 
@@ -261,26 +158,23 @@ class MedicalKnowledgeBase:
         return f"'{diagnosis}' is a base fact or unproved."
 
 
-<<<<<<< HEAD
-=======
-# ============================================================
-# VALIDATION TEST SCRIPT FOR KNOWLEDGE BASE
-# ============================================================
-import sys
-import io
-from dataclasses import dataclass
+if __name__ == "__main__":
+    import sys
+    import io
+    from dataclasses import dataclass
 
-# Force UTF-8 encoding for Windows terminals to support symbols like checkmarks
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    # Force UTF-8 encoding for Windows terminals to support symbols like checkmarks
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
 
+    # Mocking the PatientPercept from agent.py for standalone testing
+    @dataclass
+    class MockPatientPercept:
+        patient_id: str
+        symptoms: list
+        temperature: float
+        heart_rate: int
 
-# Mocking the PatientPercept from agent.py for standalone testing
-@dataclass
-class MockPatientPercept:
-    patient_id: str
-    symptoms: list
-    temperature: float
-    heart_rate: int
 
 
 def run_kb_validation():
@@ -328,7 +222,6 @@ def run_kb_validation():
     print(f"Analyze Method Result:\n{agent_result}")
 
 
->>>>>>> tabby/project-setup
 if __name__ == "__main__":
     # --- Standalone Test Execution ---
     kb = MedicalKnowledgeBase()

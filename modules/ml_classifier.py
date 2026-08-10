@@ -1,22 +1,29 @@
-# ============================================================
-# MODULE 4: ML Classifier — Supervised Diagnosis
-# Covers: Week 9 (Supervised Learning & Decision Trees)
-# Trained on data/patient_records.csv (real project dataset)
-# ============================================================
-
-import os
-import numpy as np
-import pandas as pd
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.metrics import classification_report, confusion_matrix
-from typing import List, Dict
+"""
 import matplotlib.pyplot as plt
 import seaborn as sns
-import warnings
-warnings.filterwarnings('ignore')
+
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import (
+    RandomForestClassifier,
+    GradientBoostingClassifier
+)
+
+from sklearn.model_selection import (
+    train_test_split,
+    cross_val_score
+)
+
+from sklearn.preprocessing import LabelEncoder
+
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    confusion_matrix,
+    classification_report as sklearn_classification_report
+)
+
 
 
 def find_data_file(filename: str) -> str:
@@ -42,225 +49,762 @@ def find_data_file(filename: str) -> str:
 
 class MLDiagnosticClassifier:
     """
-    Ensemble ML-based diagnostic classifier.
-    Uses Decision Trees, Random Forest, and
-    Gradient Boosting for robust diagnosis.
+    Supervised Machine Learning Diagnostic Classifier.
 
-    Trains directly on data/patient_records.csv rather than synthetic
-    data — SYMPTOM_FEATURES and DISEASE_LABELS are populated from the
-    CSV's actual columns and Diagnosis values the first time train()
-    or predict() is called.
+    Trains multiple models and automatically chooses
+    the highest-performing classifier.
     """
 
-    # Populated dynamically from the CSV in _load_data(); kept as class
-    # defaults so other code (e.g. predict() before training) has sane
-    # fallbacks that match data/patient_records.csv's real columns.
-    SYMPTOM_FEATURES = [
-        'fever', 'cough', 'headache', 'fatigue', 'sore_throat',
-        'chest_pain', 'shortness_of_breath', 'nausea', 'vomiting',
-        'diarrhea', 'body_ache', 'runny_nose', 'sneezing',
-        'loss_of_taste', 'loss_of_smell', 'chills', 'dizziness',
-        'high_blood_pressure', 'low_blood_pressure', 'high_heart_rate'
+    BASE_DIR = os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__))
+    )
+
+    DATASET_PATH = os.path.join(
+        BASE_DIR,
+        "data",
+        "patient_records.csv"
+    )
+
+    MODEL_PATH = os.path.join(
+        BASE_DIR,
+        "models",
+        "ml_classifier.pkl"
+    )
+
+    REPORT_FOLDER = os.path.join(
+        BASE_DIR,
+        "reports"
+    )
+
+    FEATURE_COLUMNS = [
+
+        "Fever",
+        "Cough",
+        "Headache",
+        "Fatigue",
+        "Sore_Throat",
+        "Chest_Pain",
+        "Shortness_of_Breath",
+        "Nausea",
+        "Vomiting",
+        "Diarrhea",
+        "Body_Ache",
+        "Runny_Nose",
+        "Sneezing",
+        "Loss_of_Taste",
+        "Loss_of_Smell",
+        "Chills",
+        "Dizziness",
+        "High_Blood_Pressure",
+        "Low_Blood_Pressure",
+        "High_Heart_Rate"
+
     ]
 
-    DISEASE_LABELS = [
-        'COVID-19', 'Common Cold', 'Food Poisoning', 'Healthy',
-        'Hypertension', 'Influenza', 'Malaria', 'Migraine',
-        'Pneumonia', 'Typhoid'
-    ]
+    TARGET_COLUMN = "Diagnosis"
 
     def __init__(self):
+
+        os.makedirs(
+            os.path.dirname(self.MODEL_PATH),
+            exist_ok=True
+        )
+
+        os.makedirs(
+            self.REPORT_FOLDER,
+            exist_ok=True
+        )
+
         self.models = {
-            'Decision Tree':     DecisionTreeClassifier(
-                max_depth=8, criterion='entropy', random_state=42),
-            'Random Forest':     RandomForestClassifier(
-                n_estimators=100, max_depth=10, random_state=42),
-            'Gradient Boosting': GradientBoostingClassifier(
-                n_estimators=100, learning_rate=0.1, random_state=42),
+
+            "Decision Tree":
+
+                DecisionTreeClassifier(
+                    criterion="entropy",
+                    random_state=42
+                ),
+
+            "Random Forest":
+
+                RandomForestClassifier(
+                    n_estimators=150,
+                    random_state=42
+                ),
+
+            "Gradient Boosting":
+
+                GradientBoostingClassifier(
+                    random_state=42
+                )
+
         }
-        self.best_model    = None
-        self.best_model_name = None
+
         self.label_encoder = LabelEncoder()
-        self.is_trained    = False
-        self._features_set = False
 
-    def _load_data(self) -> pd.DataFrame:
-        """Load the real project dataset from data/patient_records.csv.
+        self.best_model = None
+        self.best_model_name = None
 
-        The CSV's symptom columns are Title_Case (e.g. 'Sore_Throat');
-        SYMPTOM_FEATURES/predict() use lower_snake_case, matching the
-        symptom-cleaning convention used everywhere else in this project
-        ("Loss of Smell" -> "loss_of_smell"). We lowercase the columns
-        here so both sides agree.
+        self.is_trained = False
+
+        self.X_test = None
+        self.y_test = None
+
+    # ---------------------------------------------------------
+    # DATASET LOADING
+    # ---------------------------------------------------------
+
+    def load_dataset(self):
         """
-        path = find_data_file("patient_records.csv")
-        df = pd.read_csv(path)
-        df.columns = [c.strip() for c in df.columns]
+        Load patient_records.csv and validate its contents.
+        """
 
-        symptom_cols = [c for c in df.columns if c not in ("Diagnosis", "Severity")]
-        self.SYMPTOM_FEATURES = [c.lower() for c in symptom_cols]
-        self.DISEASE_LABELS = sorted(df["Diagnosis"].unique().tolist())
-        self._features_set = True
+        if not os.path.exists(self.DATASET_PATH):
 
-        # Rename to lower_snake_case so downstream code (predict(), etc.)
-        # can index columns by the same names used in SYMPTOM_FEATURES.
-        df = df.rename(columns={c: c.lower() for c in symptom_cols})
+            raise FileNotFoundError(
+                f"\nDataset not found:\n{self.DATASET_PATH}"
+            )
+
+        df = pd.read_csv(self.DATASET_PATH)
+
+        df.fillna(0, inplace=True)
+
+        missing = [
+            col
+            for col in self.FEATURE_COLUMNS
+            if col not in df.columns
+        ]
+
+        if missing:
+
+            raise ValueError(
+                f"\nDataset is missing columns:\n{missing}"
+            )
+
+        if self.TARGET_COLUMN not in df.columns:
+
+            raise ValueError(
+                "Diagnosis column not found."
+            )
+
         return df
 
-    def train(self, verbose: bool = True,
-              X_train=None, X_test=None, y_train=None, y_test=None) -> Dict:
-        """Train all models and select the best one.
+    # ---------------------------------------------------------
+    # PREPARE DATA
+    # ---------------------------------------------------------
 
-        By default, loads data/patient_records.csv and makes its own
-        80/20 split (the standalone, per-module-testing use case the lab
-        manual describes). Optionally, pass a pre-made X_train/X_test/
-        y_train/y_test (raw symptom arrays + raw Diagnosis strings) —
-        used by evaluation/metrics.py so ML classifier, Neural Network,
-        Bayesian Net and Knowledge Base can all be scored on the exact
-        same held-out patients for a fair module comparison.
+    def prepare_data(self):
+
+        df = self.load_dataset()
+
+        X = df[self.FEATURE_COLUMNS]
+
+        y = self.label_encoder.fit_transform(
+            df[self.TARGET_COLUMN]
+        )
+
+        return train_test_split(
+            X,
+            y,
+            test_size=0.20,
+            random_state=42,
+            stratify=y
+        )
+    # ---------------------------------------------------------
+    # TRAIN MODELS
+    # ---------------------------------------------------------
+
+    def train(self, verbose=True):
         """
-        if X_train is None:
-            df = self._load_data()
-            X = df[self.SYMPTOM_FEATURES].values
-            y_raw = df["Diagnosis"].values
-            X_train, X_test, y_train, y_test = train_test_split(
-                X, y_raw, test_size=0.2, random_state=42, stratify=y_raw)
-        else:
-            # SYMPTOM_FEATURES/DISEASE_LABELS still need to be correct
-            # even when we skip _load_data() — pull them once so
-            # predict() and plot_evaluation() work normally afterwards.
-            if not hasattr(self, "_features_set") or not self._features_set:
-                self._load_data()
+        Train all machine learning models and
+        automatically select the best performer.
+        """
 
-        y_train_enc = self.label_encoder.fit_transform(y_train)
-        y_test_enc  = self.label_encoder.transform(y_test)
+        X_train, X_test, y_train, y_test = self.prepare_data()
 
-        results = {}
-        best_acc = 0.0
+        self.X_test = X_test
+        self.y_test = y_test
+
+        results = []
+
+        best_accuracy = 0.0
 
         if verbose:
-            print("=" * 55)
-            print("  ML Diagnostic Classifier — Training")
-            print("=" * 55)
 
-        for name, model in self.models.items():
-            model.fit(X_train, y_train_enc)
-            # Cross-validate on the TRAIN fold only — using the full
-            # X/y here (as the original code did) would leak the held-out
-            # test patients into cross-validation.
-            cv_scores = cross_val_score(model, X_train, y_train_enc, cv=5, scoring='accuracy')
-            test_acc  = model.score(X_test, y_test_enc)
-            results[name] = {
-                'cv_mean': cv_scores.mean(),
-                'cv_std':  cv_scores.std(),
-                'test_acc': test_acc
-            }
+            print("\n" + "=" * 65)
+            print("TRAINING MACHINE LEARNING DIAGNOSTIC CLASSIFIERS")
+            print("=" * 65)
+
+        for model_name, model in self.models.items():
+
+            model.fit(X_train, y_train)
+
+            predictions = model.predict(X_test)
+
+            accuracy = accuracy_score(
+                y_test,
+                predictions
+            )
+
+            precision = precision_score(
+                y_test,
+                predictions,
+                average="weighted",
+                zero_division=0
+            )
+
+            recall = recall_score(
+                y_test,
+                predictions,
+                average="weighted",
+                zero_division=0
+            )
+
+            f1 = f1_score(
+                y_test,
+                predictions,
+                average="weighted",
+                zero_division=0
+            )
+
+            cv_scores = cross_val_score(
+                model,
+                X_train,
+                y_train,
+                cv=3,
+                scoring="accuracy"
+            )
+
+            results.append({
+
+                "Model": model_name,
+
+                "Accuracy": round(accuracy, 4),
+
+                "Precision": round(precision, 4),
+
+                "Recall": round(recall, 4),
+
+                "F1 Score": round(f1, 4),
+
+                "Cross Validation":
+                    round(cv_scores.mean(), 4)
+
+            })
+
             if verbose:
-                print(f"\n  Model: {name}")
-                print(f"     CV Accuracy : {cv_scores.mean():.4f} "
-                      f"± {cv_scores.std():.4f}")
-                print(f"     Test Accuracy: {test_acc:.4f}")
 
-            if test_acc > best_acc:
-                best_acc          = test_acc
-                self.best_model   = model
-                self.best_model_name = name
+                print(f"\n{model_name}")
+
+                print("-" * 40)
+
+                print(f"Accuracy         : {accuracy:.4f}")
+
+                print(f"Precision        : {precision:.4f}")
+
+                print(f"Recall           : {recall:.4f}")
+
+                print(f"F1 Score         : {f1:.4f}")
+
+                print(
+                    f"Cross Validation : "
+                    f"{cv_scores.mean():.4f}"
+                )
+
+            if accuracy > best_accuracy:
+
+                best_accuracy = accuracy
+
+                self.best_model = model
+
+                self.best_model_name = model_name
+
+        metrics = pd.DataFrame(results)
+
+        metrics.to_csv(
+
+            os.path.join(
+
+                self.REPORT_FOLDER,
+
+                "ml_metrics.csv"
+
+            ),
+
+            index=False
+
+        )
+
+        joblib.dump(
+
+            {
+
+                "model": self.best_model,
+
+                "encoder": self.label_encoder,
+
+                "model_name": self.best_model_name
+
+            },
+
+            self.MODEL_PATH
+
+        )
 
         self.is_trained = True
-        self._X_test = X_test
-        self._y_test = y_test_enc
 
         if verbose:
-            print(f"\n  Best Model: {self.best_model_name} "
-                  f"({best_acc:.4f})")
-        return results
+
+            print("\n" + "=" * 65)
+
+            print(
+                f"BEST MODEL : {self.best_model_name}"
+            )
+
+            print(
+                f"Accuracy   : {best_accuracy:.4f}"
+            )
+
+            print("=" * 65)
+
+            print("\nModel saved successfully.")
+
+            print(
+                f"Saved to: {self.MODEL_PATH}"
+            )
+
+            print(
+                f"Metrics : "
+                f"{self.REPORT_FOLDER}/ml_metrics.csv"
+            )
+
+        return metrics
+
+
+    # ---------------------------------------------------------
+    # LOAD SAVED MODEL
+    # ---------------------------------------------------------
+
+    def load_model(self):
+        """
+        Load the previously trained model from disk.
+        """
+
+        if not os.path.exists(self.MODEL_PATH):
+
+            return False
+
+        saved = joblib.load(self.MODEL_PATH)
+
+        self.best_model = saved["model"]
+
+        self.label_encoder = saved["encoder"]
+
+        self.best_model_name = saved["model_name"]
+
+        self.is_trained = True
+
+        return True
+    # ---------------------------------------------------------
+    # PREDICT DIAGNOSIS
+    # ---------------------------------------------------------
 
     def predict(self, symptoms: List[str]) -> Dict:
-        """Predict disease from symptom list"""
+        """
+        Predict the most likely diagnosis from
+        a list of symptoms.
+
+        Example
+        -------
+        ["fever", "cough", "fatigue"]
+        """
+
         if not self.is_trained:
-            self.train(verbose=False)
 
-        symptoms = [s.lower().strip() for s in symptoms
-                    if s.lower().strip() in self.SYMPTOM_FEATURES]
+            if not self.load_model():
 
-        features = np.array([
-            [1 if s in symptoms else 0
-             for s in self.SYMPTOM_FEATURES]
-        ])
-        pred_encoded = self.best_model.predict(features)[0]
-        pred_proba   = self.best_model.predict_proba(features)[0]
+                self.train(verbose=False)
 
-        disease  = self.label_encoder.inverse_transform([pred_encoded])[0]
-        classes  = self.label_encoder.inverse_transform(
-            range(len(pred_proba)))
-        prob_map = dict(zip(classes, pred_proba))
-        top5     = sorted(prob_map.items(), key=lambda x: x[1], reverse=True)[:5]
+        # ---------------------------------------------
+        # Normalize symptom names
+        # ---------------------------------------------
 
-        return {
-            'diagnosis':      disease,
-            'confidence':     round(float(pred_proba[pred_encoded]), 4),
-            'top5':           top5,
-            'all_probs':      {k: round(float(v), 4) for k, v in prob_map.items()},
-            'model_used':     self.best_model_name,
-            'symptom_vector': features[0].tolist()
+        normalized_symptoms = {
+
+            symptom.strip()
+                   .lower()
+                   .replace(" ", "_")
+
+            for symptom in symptoms
+
         }
 
-    def analyze(self, percept) -> Dict:
-        """Module interface for the agent"""
-        result = self.predict(percept.symptoms)
-        result['summary'] = (f"{result['model_used']}: "
-                             f"{result['diagnosis']} "
-                             f"({result['confidence']:.2%})")
+        feature_vector = []
+
+        for feature in self.FEATURE_COLUMNS:
+
+            feature_name = feature.lower()
+
+            if feature_name in normalized_symptoms:
+
+                feature_vector.append(1)
+
+            else:
+
+                feature_vector.append(0)
+
+        feature_vector = np.array(
+            feature_vector
+        ).reshape(1, -1)
+
+        # ---------------------------------------------
+        # Predict diagnosis
+        # ---------------------------------------------
+
+        prediction = self.best_model.predict(
+            feature_vector
+        )[0]
+
+        probabilities = self.best_model.predict_proba(
+            feature_vector
+        )[0]
+
+        diagnosis = self.label_encoder.inverse_transform(
+
+            [prediction]
+
+        )[0]
+
+        confidence = float(np.max(probabilities))
+
+        probability_table = {}
+
+        for disease, probability in zip(
+
+            self.label_encoder.classes_,
+
+            probabilities
+
+        ):
+
+            probability_table[disease] = round(
+
+                float(probability),
+
+                4
+
+            )
+
+        ranked_predictions = sorted(
+
+            probability_table.items(),
+
+            key=lambda item: item[1],
+
+            reverse=True
+
+        )
+
+        return {
+
+            "diagnosis": diagnosis,
+
+            "confidence": round(confidence, 4),
+
+            "model_used": self.best_model_name,
+
+            "symptom_vector": feature_vector.tolist()[0],
+
+            "top_predictions": ranked_predictions
+
+        }
+
+
+    # ---------------------------------------------------------
+    # AGENT INTERFACE
+    # ---------------------------------------------------------
+
+    def analyze(self, percept):
+        """
+        Interface used by app.py
+
+        percept.symptoms should contain
+        a list of patient symptoms.
+        """
+
+        result = self.predict(
+
+            percept.symptoms
+
+        )
+
+        result["summary"] = (
+
+            f"{result['model_used']} predicts "
+
+            f"{result['diagnosis']} "
+
+            f"with "
+
+            f"{result['confidence']:.2%} confidence."
+
+        )
+
         return result
 
+
+    # ---------------------------------------------------------
+    # CLASSIFICATION REPORT
+    # ---------------------------------------------------------
+
+    def generate_classification_report(self):
+        """
+        Print a detailed sklearn classification report.
+        """
+
+        if not self.is_trained:
+
+            self.train(verbose=False)
+
+        predictions = self.best_model.predict(
+
+            self.X_test
+
+        )
+
+        print(
+
+            sklearn_classification_report(
+
+                self.y_test,
+
+                predictions,
+
+                target_names=self.label_encoder.classes_
+
+            )
+
+        )
+
+
+    # ---------------------------------------------------------
+    # TOP PREDICTIONS
+    # ---------------------------------------------------------
+
+    def print_top_predictions(
+            self,
+            prediction_result: Dict
+    ):
+        """
+        Display ranked diagnosis predictions.
+        """
+
+        print("\nTop Predictions")
+
+        print("-" * 45)
+
+        for disease, probability in prediction_result[
+            "top_predictions"
+        ]:
+
+            print(
+
+                f"{disease:<25}"
+
+                f"{probability:.2%}"
+
+            )
+    # ---------------------------------------------------------
+    # PLOT MODEL EVALUATION
+    # ---------------------------------------------------------
+
     def plot_evaluation(self):
-        """Visualize model performance"""
+        """
+        Generate evaluation plots and save them
+        inside the reports folder.
+        """
+
         if not self.is_trained:
             self.train(verbose=False)
 
-        y_pred = self.best_model.predict(self._X_test)
-        print(classification_report(
-            self._y_test,
-            y_pred,
-            target_names=self.label_encoder.classes_))
+        predictions = self.best_model.predict(self.X_test)
 
-        cm     = confusion_matrix(self._y_test, y_pred)
         labels = self.label_encoder.classes_
 
-        fig, axes = plt.subplots(1, 2, figsize=(16, 6))
-
+        # -------------------------------------------------
         # Confusion Matrix
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
-                    xticklabels=labels, yticklabels=labels, ax=axes[0])
-        axes[0].set_title(f"Confusion Matrix\n({self.best_model_name})",
-                          fontweight='bold')
-        axes[0].set_xlabel("Predicted"); axes[0].set_ylabel("True")
-        plt.setp(axes[0].xaxis.get_majorticklabels(), rotation=45, ha='right')
+        # -------------------------------------------------
 
-        # Feature Importance
-        if hasattr(self.best_model, 'feature_importances_'):
-            importances = self.best_model.feature_importances_
-            sorted_idx  = np.argsort(importances)[::-1][:12]
-            top_features = [self.SYMPTOM_FEATURES[i] for i in sorted_idx]
-            top_values   = importances[sorted_idx]
-            colors = plt.cm.RdYlGn(top_values / top_values.max())
-            axes[1].barh(range(len(top_features)), top_values[::-1],
-                         color=colors[::-1])
-            axes[1].set_yticks(range(len(top_features)))
-            axes[1].set_yticklabels(top_features[::-1])
-            axes[1].set_title("Feature Importances (Top 12)",
-                              fontweight='bold')
-            axes[1].set_xlabel("Importance Score")
+        cm = confusion_matrix(
+            self.y_test,
+            predictions
+        )
 
-        plt.suptitle(f"ML Diagnostic Model Evaluation — {self.best_model_name}",
-                     fontsize=14, fontweight='bold')
+        plt.figure(figsize=(10, 8))
+
+        sns.heatmap(
+            cm,
+            annot=True,
+            fmt="d",
+            cmap="Blues",
+            xticklabels=labels,
+            yticklabels=labels
+        )
+
+        plt.title(
+            f"Confusion Matrix ({self.best_model_name})",
+            fontsize=14,
+            fontweight="bold"
+        )
+
+        plt.xlabel("Predicted Diagnosis")
+        plt.ylabel("Actual Diagnosis")
+
+        plt.xticks(rotation=45)
+        plt.yticks(rotation=0)
+
         plt.tight_layout()
-        plt.savefig("ml_evaluation.png", dpi=150, bbox_inches="tight")
 
-        # Display the graph once
-        plt.show(block=True)
+        confusion_path = os.path.join(
+            self.REPORT_FOLDER,
+            "confusion_matrix.png"
+        )
 
-        # Close all figure windows after the user closes the graph
-        plt.close("all")
+        plt.savefig(
+            confusion_path,
+            dpi=300
+        )
 
-        print("Saved: ml_evaluation.png")
+        plt.show()
+
+        plt.close()
+
+        # -------------------------------------------------
+        # Feature Importance
+        # -------------------------------------------------
+
+        if hasattr(self.best_model, "feature_importances_"):
+
+            importance = self.best_model.feature_importances_
+
+            importance_df = pd.DataFrame({
+
+                "Feature": self.FEATURE_COLUMNS,
+
+                "Importance": importance
+
+            })
+
+            importance_df = importance_df.sort_values(
+
+                by="Importance",
+
+                ascending=False
+
+            )
+
+            plt.figure(figsize=(12, 8))
+
+            sns.barplot(
+
+                data=importance_df,
+
+                x="Importance",
+
+                y="Feature"
+
+            )
+
+            plt.title(
+
+                "Feature Importance",
+
+                fontsize=14,
+
+                fontweight="bold"
+
+            )
+
+            plt.tight_layout()
+
+            feature_path = os.path.join(
+
+                self.REPORT_FOLDER,
+
+                "feature_importance.png"
+
+            )
+
+            plt.savefig(
+
+                feature_path,
+
+                dpi=300
+
+            )
+
+            plt.show()
+
+            plt.close()
+
+        print("\nEvaluation complete.")
+
+        print(
+            f"Metrics CSV           : {self.REPORT_FOLDER}/ml_metrics.csv"
+        )
+
+        print(
+            f"Confusion Matrix      : {self.REPORT_FOLDER}/confusion_matrix.png"
+        )
+
+        print(
+            f"Feature Importance    : {self.REPORT_FOLDER}/feature_importance.png"
+        )
+
+
+# ==========================================================
+# TESTING
+# ==========================================================
+
+if __name__ == "__main__":
+
+    classifier = MLDiagnosticClassifier()
+
+    classifier.train()
+
+    print("\n" + "=" * 60)
+    print("SAMPLE PREDICTION")
+    print("=" * 60)
+
+    symptoms = [
+
+        "Fever",
+
+        "Cough",
+
+        "Fatigue",
+
+        "Loss_of_Smell"
+
+    ]
+
+    result = classifier.predict(symptoms)
+
+    print(f"\nSymptoms  : {symptoms}")
+
+    print(f"Diagnosis : {result['diagnosis']}")
+
+    print(f"Confidence: {result['confidence']:.2%}")
+
+    print(f"Model     : {result['model_used']}")
+
+    classifier.print_top_predictions(result)
+
+    print("\nGenerating classification report...\n")
+
+    classifier.generate_classification_report()
+
+    print("\nGenerating evaluation graphs...\n")
+
+    classifier.plot_evaluation()
+
+    print("\nModule testing completed successfully.")
