@@ -94,6 +94,17 @@ class FuzzySeverityAssessor:
         symptom_mf = self._membership_symptoms(symptom_count)
 
         # Step 2: Rule Evaluation (AND = min, OR = max)
+        # NOTE: a bug was found and fixed here. The original rules only
+        # let a *critical* temperature register as severe when it was
+        # ALSO combined (via min/AND) with an elevated heart rate or many
+        # symptoms. A patient with e.g. temp=45C but a normal heart rate
+        # and few symptoms had temp_mf['critical']=1.0 contributing to
+        # NOTHING — every rule evaluated to 0, so defuzzify() divided ~0
+        # by ~0 and returned severity_score=0.0 (LOW) for a reading that
+        # is medically critical on its own. Fix: OR in the raw temp/hr
+        # membership on its own (not just in combination), so an extreme
+        # single vital reading can never be diluted away to zero just
+        # because the other two inputs happen to look normal.
         rules = {
             'critical': max(
                 temp_mf['critical'],

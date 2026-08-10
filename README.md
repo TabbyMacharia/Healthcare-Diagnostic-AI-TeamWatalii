@@ -101,6 +101,14 @@ pip install -r requirements.txt
 
 ```text
 .
+├── data/
+│   ├── diseases.csv
+│   ├── patient_records.csv
+│   ├── symptoms.csv
+├── evaluation
+│   ├── metrics.py
+│   ├── visualizations.py
+│   ├── ml_evaluation.png
 ├── modules/
 │   ├── agent.py
 │   ├── bayesian_net.py
@@ -111,7 +119,14 @@ pip install -r requirements.txt
 │   ├── planner.py
 │   └── test_ml_classifier.py
 ├── reports/
-│   └── final_report.pdf
+│   ├── confusion_matrices_all.png
+│   ├── confusion_matrix_BayesianNet.png
+│   ├── confusion_matrix_KnowledgeBase.png
+│   ├── confusion_matrix_MLClassifier.png
+│   ├── confusion_matrix_NeuralNetwork.png
+│   ├── module_comparison.png
+│   ├── roc_curves.png
+│   └── AI CAPSTONE PROJECT REPORT.pdf
 ├── app.py
 ├── requirements.txt
 ├── Environment Setup
@@ -134,10 +149,10 @@ python app.py
 
 | Model | Accuracy | Precision | Recall | F1-Score |
 |--------|----------|-----------|--------|----------|
-| Decision Tree | Pending | Pending | Pending | Pending |
-| Random Forest | Pending | Pending | Pending | Pending |
-| Gradient Boosting | Pending | Pending | Pending | Pending |
-| Neural Network | Pending | Pending | Pending | Pending |
+| Decision Tree | 83.0% | 85.8% | 83.1% | 83.5% |
+| Random Forest | 92.0% | 92.9% | 92.3% | 92.1% |
+| Gradient Boosting | 90.0% | 90.8% | 90.5% | 90.1% |
+| Neural Network | 91.0% | 91.6% | 91.4% | 90.9% |
 
 
 ## Development Workflow

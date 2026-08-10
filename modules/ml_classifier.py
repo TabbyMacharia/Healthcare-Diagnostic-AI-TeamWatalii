@@ -1,36 +1,4 @@
 """
-============================================================
-MODULE 4: Machine Learning Diagnostic Classifier
-Healthcare Diagnostic Assistant
-
-Author: Team Watalii
-
-Description:
-This module trains several supervised machine learning
-models using patient symptom data and automatically
-selects the best-performing model for diagnosis.
-
-Algorithms
-----------
-• Decision Tree
-• Random Forest
-• Gradient Boosting
-
-Outputs
--------
-• Trained model (.pkl)
-• Metrics CSV
-• Confusion Matrix
-• Feature Importance Graph
-============================================================
-"""
-
-import os
-from typing import Dict, List
-
-import joblib
-import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -55,6 +23,28 @@ from sklearn.metrics import (
     confusion_matrix,
     classification_report as sklearn_classification_report
 )
+
+
+
+def find_data_file(filename: str) -> str:
+    """Locate a data/ CSV whether this module is run from the project
+    root, from inside modules/, or imported as a package. Tries the
+    project layout from the lab manual (data/ as a sibling of modules/)
+    first, then falls back to a few common alternatives."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(here, "..", "data", filename),
+        os.path.join(here, "data", filename),
+        os.path.join("data", filename),
+        filename,
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            return c
+    raise FileNotFoundError(
+        f"Could not find '{filename}'. Expected it inside a data/ folder "
+        f"next to modules/ (see the lab manual's project structure)."
+    )
 
 
 class MLDiagnosticClassifier:

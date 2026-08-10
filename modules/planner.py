@@ -82,6 +82,44 @@ class TreatmentPlanner:
                 'cost': 1, 'duration': '1 hour'
             },
             {
+                # Ward-level rehydration for non-ICU cases (e.g. Food
+                # Poisoning, Typhoid) — AdministerFluids above only fires
+                # once a patient is already in the ICU, which left milder
+                # dehydration-risk cases with no route to TREATMENT_STARTED.
+                'name': 'AdministerOralRehydration',
+                'precond': {'DIAGNOSIS_CONFIRMED', 'DEHYDRATION_RISK'},
+                'delete':  {'DEHYDRATION_RISK'},
+                'add':     {'REHYDRATION_STARTED', 'TREATMENT_STARTED'},
+                'cost': 1, 'duration': '1 hour'
+            },
+            {
+                # Malaria is parasitic, not viral/bacterial — needs its
+                # own medication action distinct from PrescribeAntiviral/
+                # PrescribeAntibiotics.
+                'name': 'PrescribeAntimalarial',
+                'precond': {'DIAGNOSIS_CONFIRMED', 'PARASITIC_INFECTION'},
+                'delete':  {'PARASITIC_INFECTION'},
+                'add':     {'ANTIMALARIAL_PRESCRIBED', 'TREATMENT_STARTED'},
+                'cost': 1, 'duration': '10 minutes'
+            },
+            {
+                # Chronic conditions (Hypertension) — ongoing management,
+                # not a cure, but still counts as "treatment started".
+                'name': 'PrescribeAntihypertensive',
+                'precond': {'DIAGNOSIS_CONFIRMED', 'CHRONIC_CONDITION'},
+                'delete':  {'CHRONIC_CONDITION'},
+                'add':     {'MEDICATION_PRESCRIBED', 'TREATMENT_STARTED'},
+                'cost': 1, 'duration': '10 minutes'
+            },
+            {
+                # Migraine — symptomatic pain relief.
+                'name': 'PrescribePainRelief',
+                'precond': {'DIAGNOSIS_CONFIRMED', 'NEUROLOGICAL_CONDITION'},
+                'delete':  {'NEUROLOGICAL_CONDITION'},
+                'add':     {'PAIN_RELIEF_PRESCRIBED', 'TREATMENT_STARTED'},
+                'cost': 1, 'duration': '10 minutes'
+            },
+            {
                 'name': 'MonitorVitals',
                 'precond': {'TREATMENT_STARTED', 'PATIENT_PRESENT'},
                 'delete':  set(),
@@ -148,38 +186,57 @@ class TreatmentPlanner:
 
         return None
 
+    # Maps each disease name (as produced by ml_classifier.py /
+    # neural_network.py / bayesian_net.py / knowledge_base.py, i.e. the
+    # exact Diagnosis values in data/patient_records.csv) to the STRIPS
+    # initial-state predicates that get this patient's plan started.
+    DIAGNOSIS_STATES = {
+        'covid_19':       {'COVID_SUSPECTED', 'CONTAGIOUS_DISEASE',
+                           'VIRAL_INFECTION', 'DIAGNOSIS_NEEDED'},
+        'influenza':      {'VIRAL_INFECTION', 'DIAGNOSIS_NEEDED'},
+        'common_cold':    {'VIRAL_INFECTION', 'DIAGNOSIS_NEEDED'},
+        'pneumonia':      {'BACTERIAL_INFECTION', 'DIAGNOSIS_NEEDED'},
+        'malaria':        {'PARASITIC_INFECTION', 'DIAGNOSIS_NEEDED'},
+        'typhoid':        {'BACTERIAL_INFECTION', 'DIAGNOSIS_NEEDED', 'DEHYDRATION_RISK'},
+        'hypertension':   {'CHRONIC_CONDITION', 'DIAGNOSIS_NEEDED'},
+        'migraine':       {'NEUROLOGICAL_CONDITION', 'DIAGNOSIS_NEEDED'},
+        'food_poisoning': {'DEHYDRATION_RISK', 'DIAGNOSIS_NEEDED'},
+    }
+
     def create_treatment_plan(self, diagnosis: str,
                               urgency: str) -> Dict:
         """Generate a treatment plan for a given diagnosis"""
 
-        # Map diagnosis to initial state predicates
-        diagnosis_states = {
-            'flu':          {'VIRAL_INFECTION', 'DIAGNOSIS_NEEDED'},
-            'covid19':      {'COVID_SUSPECTED', 'CONTAGIOUS_DISEASE',
-                             'DIAGNOSIS_NEEDED'},
-            'cardiac_event':{'EMERGENCY_CASE',  'ICU_AVAILABLE'},
-            'dengue':       {'VIRAL_INFECTION',  'DIAGNOSIS_NEEDED',
-                             'DEHYDRATION_RISK'},
-            'meningitis':   {'EMERGENCY_CASE',  'BACTERIAL_INFECTION',
-                             'ICU_AVAILABLE'},
-            'tuberculosis': {'BACTERIAL_INFECTION', 'CONTAGIOUS_DISEASE',
-                             'DIAGNOSIS_NEEDED'},
-            'diabetes':     {'DIAGNOSIS_NEEDED'},
-            'common_cold':  {'VIRAL_INFECTION', 'DIAGNOSIS_NEEDED'},
-        }
+        norm = diagnosis.lower().replace(' ', '_').replace('-', '_')
+
+        # A "Healthy" diagnosis needs no treatment plan at all.
+        if norm == 'healthy':
+            return {
+                'diagnosis': diagnosis, 'urgency': urgency,
+                'initial_state': [], 'goal_state': [],
+                'steps': 0, 'total_duration': 'N/A', 'plan': [],
+                'note': 'No treatment required — patient is healthy.'
+            }
 
         base_state = {'PATIENT_PRESENT'}
-        dx_state   = diagnosis_states.get(
-            diagnosis.lower().replace(' ', '_'),
-            {'DIAGNOSIS_NEEDED'}
-        )
+        dx_state = self.DIAGNOSIS_STATES.get(norm, {'DIAGNOSIS_NEEDED'})
         initial_state = base_state | dx_state
 
         # Goal state: always end with treatment and monitoring
         goal_state = {'TREATMENT_STARTED', 'VITALS_MONITORED',
                       'FOLLOWUP_SCHEDULED'}
+
+        # NOTE on a bug fixed here: the original code added PATIENT_IN_ICU
+        # to the *goal* for any CRITICAL case, but PATIENT_IN_ICU is only
+        # reachable via TransferToICU, which needs EMERGENCY_SERVICES_CALLED
+        # + ICU_AVAILABLE in the *initial* state. Only 'cardiac_event' ever
+        # set those, so BFS would return "no plan found" for e.g. a CRITICAL
+        # Pneumonia case. Fix: put the patient on the emergency track in the
+        # initial state instead, and let the existing action chain
+        # (CallEmergencyServices -> TransferToICU -> StabilizeCardiacPatient)
+        # carry them to TREATMENT_STARTED regardless of the specific disease.
         if urgency == 'CRITICAL':
-            goal_state.add('PATIENT_IN_ICU')
+            initial_state |= {'EMERGENCY_CASE', 'ICU_AVAILABLE'}
 
         plan = self.generate_plan(initial_state, goal_state)
 
@@ -209,11 +266,20 @@ class TreatmentPlanner:
         return f"{len(plan)} actions | see individual durations"
 
     def analyze(self, percept) -> Dict:
-        """Module interface — generates a sample plan"""
-        # This is called post-diagnosis; use KB result
-        result = self.create_treatment_plan('flu', 'MEDIUM')
-        result['summary']    = f"Plan: {result['steps']} steps generated"
-        result['diagnosis']  = 'flu'
-        result['confidence'] = 0.7
-        return result
+        """
+        Module interface for the agent.
+
+        IMPORTANT: agent.think() calls .analyze() on every registered
+        module and folds any 'diagnosis'/'confidence' keys it finds into
+        the cross-module vote (see agent.py's _aggregate_diagnosis and
+        act()). The planner doesn't diagnose anything — the real
+        treatment plan is generated afterwards in app.py's
+        show_treatment_plan(), once the Agent already knows the actual
+        diagnosis. So this deliberately returns no 'diagnosis' or
+        'confidence' key: including a guessed one here would silently
+        pollute the vote from the 4 real diagnostic modules on every run.
+        """
+        return {
+            'summary': "Treatment planning deferred until diagnosis is confirmed"
+        }
 # Module completed.
