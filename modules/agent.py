@@ -10,8 +10,9 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Optional
 import datetime
 
-# Force UTF-8 output for Windows terminals to support emojis
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+if __name__ == "__main__" and hasattr(sys.stdout, "reconfigure"):
+    # Force UTF-8 output for Windows terminals to support emojis
+    sys.stdout.reconfigure(encoding="utf-8")
 
 class AgentState(Enum):
     IDLE         = "idle"

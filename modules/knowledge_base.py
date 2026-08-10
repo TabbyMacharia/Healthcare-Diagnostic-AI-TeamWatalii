@@ -164,20 +164,23 @@ class MedicalKnowledgeBase:
 # ============================================================
 # VALIDATION TEST SCRIPT FOR KNOWLEDGE BASE
 # ============================================================
-import sys
-import io
-from dataclasses import dataclass
+if __name__ == "__main__":
+    import sys
+    import io
+    from dataclasses import dataclass
 
-# Force UTF-8 encoding for Windows terminals to support symbols like checkmarks
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    # Force UTF-8 encoding for Windows terminals to support symbols like checkmarks
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
 
-# Mocking the PatientPercept from agent.py for standalone testing
-@dataclass
-class MockPatientPercept:
-    patient_id: str
-    symptoms: list
-    temperature: float
-    heart_rate: int
+    # Mocking the PatientPercept from agent.py for standalone testing
+    @dataclass
+    class MockPatientPercept:
+        patient_id: str
+        symptoms: list
+        temperature: float
+        heart_rate: int
+
 
 def run_kb_validation():
     print("--- STARTING KNOWLEDGE BASE VALIDATION ---")
