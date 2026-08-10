@@ -337,7 +337,11 @@ def menu():
                 print("\nOperation cancelled.")
 
             except Exception as e:
+                import traceback
                 print(f"\nError: {e}")
+                print("\n--- Full traceback (for debugging) ---")
+                traceback.print_exc()
+                print("--- end traceback ---\n")
 
         elif choice == "2":
 

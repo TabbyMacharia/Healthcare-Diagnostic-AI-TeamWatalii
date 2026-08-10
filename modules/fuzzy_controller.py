@@ -18,44 +18,45 @@ class FuzzySeverityAssessor:
         """
         Temperature membership functions.
         Calculates degrees of membership across [normal, mild, high, critical].
-        Ensures proper open-ended boundary clipping for extreme values.
+        Clamped to [0.0, 1.0] to prevent overflow.
         """
         return {
-            'normal': 1.0 if temp <= 36.5 else max(0.0, min(1.0, (37.5 - temp) / 1.0)),
-            'mild': max(0.0, min(1.0, 1.0 - abs(temp - 38.0) / 0.8)),
-            'high': max(0.0, min(1.0, 1.0 - abs(temp - 39.0) / 0.8)),
-            'critical': 0.0 if temp < 39.0 else min(1.0, (temp - 39.0) / 1.5)
+            'normal': max(0.0, min(1.0, (37.5 - temp) / 1.0)) if temp <= 37.5 else 0.0,
+            'mild': max(0.0, min(1.0, 1.0 - abs(temp - 38.0) / 1.0)),
+            'high': max(0.0, min(1.0, 1.0 - abs(temp - 39.0) / 1.0)),
+            'critical': max(0.0, min(1.0, (temp - 39.0) / 1.5)) if temp >= 39.0 else 0.0
         }
 
     def _membership_hr(self, hr: int) -> Dict[str, float]:
         """
         Heart rate membership functions.
         Calculates degrees of membership across [low, normal, elevated, high].
-        Ensures lower and upper bounds clip to 1.0 at physiological extremes.
+        Clamped to [0.0, 1.0].
         """
         return {
-            'low': 1.0 if hr <= 60 else max(0.0, min(1.0, (75.0 - hr) / 15.0)),
-            'normal': max(0.0, min(1.0, 1.0 - abs(hr - 75.0) / 15.0)),
-            'elevated': max(0.0, min(1.0, 1.0 - abs(hr - 95.0) / 15.0)),
-            'high': 0.0 if hr < 95 else min(1.0, (hr - 95.0) / 25.0)
+            'low': max(0.0, min(1.0, (70.0 - hr) / 10.0)) if hr <= 70 else 0.0,
+            'normal': max(0.0, min(1.0, 1.0 - abs(hr - 80.0) / 20.0)),
+            'elevated': max(0.0, min(1.0, 1.0 - abs(hr - 100.0) / 15.0)),
+            'high': max(0.0, min(1.0, (hr - 100.0) / 20.0)) if hr >= 100 else 0.0
         }
 
     def _membership_symptoms(self, count: int) -> Dict[str, float]:
         """
         Symptom count membership functions.
         Calculates degrees of membership across [few, moderate, many].
+        Clamped to [0.0, 1.0].
         """
         return {
-            'few': 1.0 if count <= 1 else max(0.0, min(1.0, (3.0 - count) / 2.0)),
-            'moderate': max(0.0, min(1.0, 1.0 - abs(count - 3.5) / 1.5)),
-            'many': 0.0 if count < 4 else min(1.0, (count - 4.0) / 2.0)
+            'few': max(0.0, min(1.0, (3.0 - count) / 2.0)) if count <= 3 else 0.0,
+            'moderate': max(0.0, min(1.0, 1.0 - abs(count - 4.0) / 2.0)),
+            'many': max(0.0, min(1.0, (count - 5.0) / 3.0)) if count >= 5 else 0.0
         }
 
     def _defuzzify(self, severity_rules: Dict[str, float]) -> float:
         """
         Centroid Defuzzification Method.
         Converts rule activation strengths into a crisp continuous score (0-100).
-        Includes safety handling to prevent 0.0 outputs when total weight is zero.
+        Includes 1e-10 epsilon to prevent division by zero errors.
         """
         centers = {
             'low': 15.0,
@@ -65,14 +66,9 @@ class FuzzySeverityAssessor:
             'critical': 92.0
         }
 
-        total_weight = sum(severity_rules.values())
-
-        # Fallback safeguard: If no rules fired or total weight is zero, return neutral score
-        if total_weight == 0.0:
-            return 50.0
-
         numerator = sum(centers[k] * v for k, v in severity_rules.items() if k in centers)
-        return numerator / total_weight
+        denominator = sum(severity_rules.values()) + 1e-10
+        return numerator / denominator
 
     def _classify(self, score: float) -> str:
         """Categorizes continuous 0-100 score into severity levels."""
@@ -107,31 +103,30 @@ class FuzzySeverityAssessor:
         # because the other two inputs happen to look normal.
         rules = {
             'critical': max(
-                temp_mf['critical'],
-                min(temp_mf['high'], hr_mf['high']),
-                min(temp_mf['critical'], symptom_mf['many'])
+                min(temp_mf['critical'], hr_mf['high']),
+                min(temp_mf['critical'], symptom_mf['many']),
+                temp_mf['critical'],  # critical temp alone is enough
+                hr_mf['high']  # critical heart rate alone is enough
             ),
             'high': max(
                 min(temp_mf['high'], hr_mf['elevated']),
                 min(temp_mf['high'], symptom_mf['many']),
                 min(temp_mf['mild'], hr_mf['high']),
-                min(hr_mf['high'], symptom_mf['moderate'])
+                temp_mf['high']  # high temp alone still counts as 'high'
             ),
             'moderate': max(
                 min(temp_mf['mild'], hr_mf['normal']),
-                min(temp_mf['normal'], hr_mf['elevated']),
-                min(temp_mf['high'], symptom_mf['few']),
-                min(temp_mf['normal'], symptom_mf['many']),
-                min(hr_mf['elevated'], symptom_mf['moderate'])
+                min(temp_mf['high'], symptom_mf['moderate']),
+                min(temp_mf['normal'], symptom_mf['many'])
             ),
             'mild': max(
                 min(temp_mf['mild'], symptom_mf['few']),
-                min(temp_mf['normal'], symptom_mf['moderate']),
-                min(temp_mf['normal'], hr_mf['elevated'])
+                min(temp_mf['normal'], symptom_mf['moderate'])
             ),
-            'low': max(
-                min(temp_mf['normal'], hr_mf['normal'], symptom_mf['few']),
-                min(temp_mf['normal'], hr_mf['low'], symptom_mf['few'])
+            'low': min(
+                temp_mf['normal'],
+                hr_mf['normal'],
+                symptom_mf['few']
             )
         }
 
@@ -161,16 +156,28 @@ class FuzzySeverityAssessor:
 
         result = self.assess(temperature, heart_rate, len(symptoms))
 
-        # Format required standard output keys for agent.py integration
+        # Format required standard output keys for agent.py integration.
+        #
+        # NOTE — bug fixed here: this used to also set result['diagnosis']
+        # = result['severity_label'] (e.g. "LOW", "HIGH"). agent.py's
+        # _aggregate_diagnosis() treats *any* module's 'diagnosis' key as
+        # a vote for the patient's disease — so a severity label like
+        # "LOW" was literally competing against "Influenza"/"Malaria"/etc.
+        # for the final diagnosis. It went unnoticed as long as the 4 real
+        # diagnostic modules agreed (their 4 votes outweighed Fuzzy's 1),
+        # but with ambiguous symptoms where KB/Bayes/ML/NN each guess
+        # differently, Fuzzy's stray vote could tip — or even win — a tie.
+        # FuzzyController assesses severity, not disease, so it should
+        # never participate in that vote at all. Its severity info is
+        # still returned below (severity_label/severity_score) — agent.py
+        # now reads those explicitly to influence urgency instead.
         result['summary'] = f"Severity: {result['severity_label']} ({result['severity_score']:.1f}/100)"
-        result['diagnosis'] = result['severity_label']
-        result['confidence'] = round(result['severity_score'] / 100.0, 4)
 
         return result
 
 
 # ============================================================
-# MODULE TESTER
+# MODULE TESTER (Matches Lab Manual Test Bench)
 # ============================================================
 if __name__ == "__main__":
     fa = FuzzySeverityAssessor()
@@ -180,10 +187,9 @@ if __name__ == "__main__":
         (38.5, 95, 4, "Mild illness"),
         (39.8, 115, 7, "Severe case"),
         (40.2, 130, 9, "Critical case"),
-        (65.0, 72, 3, "Extreme Outlier Input"),
     ]
 
     print("--- Testing Fuzzy Severity Assessor ---")
     for temp, hr, count, desc in test_cases:
         res = fa.assess(temp, hr, count)
-        print(f"{desc:<22}: Score = {res['severity_score']:<5} | Label = {res['severity_label']}")
+        print(f"{desc:<15}: Score = {res['severity_score']:<5} | Label = {res['severity_label']}")

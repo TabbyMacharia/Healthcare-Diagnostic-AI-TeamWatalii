@@ -64,7 +64,7 @@ def load_canonical_split(test_size=0.2, random_state=42):
     df.columns = [c.strip() for c in df.columns]
 
     symptom_cols = [c for c in df.columns if c not in ("Diagnosis", "Severity")]
-    y = df["Diagnosis"].values
+    y = df["Diagnosis"].to_numpy(dtype=object)
 
     train_idx, test_idx = train_test_split(
         np.arange(len(df)), test_size=test_size,
@@ -73,10 +73,10 @@ def load_canonical_split(test_size=0.2, random_state=42):
     train_df = df.iloc[train_idx].reset_index(drop=True)
     test_df = df.iloc[test_idx].reset_index(drop=True)
 
-    X_train = train_df[symptom_cols].values
-    X_test = test_df[symptom_cols].values
-    y_train = train_df["Diagnosis"].values
-    y_test = test_df["Diagnosis"].values
+    X_train = train_df[symptom_cols].to_numpy(dtype=float)
+    X_test = test_df[symptom_cols].to_numpy(dtype=float)
+    y_train = train_df["Diagnosis"].to_numpy(dtype=object)
+    y_test = test_df["Diagnosis"].to_numpy(dtype=object)
 
     return train_df, test_df, symptom_cols, X_train, X_test, y_train, y_test
 

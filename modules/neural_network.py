@@ -86,8 +86,11 @@ class NeuralDiagnosticModel:
         symptom_cols = [c for c in df.columns if c not in ("Diagnosis", "Severity")]
         self.SYMPTOM_FEATURES = [c.lower() for c in symptom_cols]
 
-        X = df[symptom_cols].values.astype(np.float32)
-        y = df["Diagnosis"].values
+        # NOTE: .to_numpy() instead of .values — see ml_classifier.py's
+        # _load_data() for why .values is unsafe here (PyArrow-backed
+        # pandas arrays can't be fancy-indexed by sklearn).
+        X = df[symptom_cols].to_numpy(dtype=np.float32)
+        y = df["Diagnosis"].to_numpy(dtype=object)
         return X, y
 
     def _build_model(self):

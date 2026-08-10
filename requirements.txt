@@ -1,0 +1,19 @@
+# requirements.txt
+#
+# NOTE: tensorflow was removed from this list. neural_network.py was
+# rewritten to use scikit-learn's MLPClassifier instead of TensorFlow/
+# Keras, since TensorFlow doesn't publish installable wheels for every
+# Python version. scikit-learn (already required for ml_classifier.py)
+# covers the neural network module too now — no separate deep learning
+# framework needed.
+numpy>=1.24.0
+pandas>=2.0.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+scikit-learn>=1.3.0
+pgmpy>=0.1.23
+scikit-fuzzy>=0.4.2
+nltk>=3.8.1
+networkx>=3.1
+gymnasium>=0.29.0
+scipy>=1.11.0
