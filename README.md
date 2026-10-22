@@ -15,7 +15,7 @@ The project combines multiple Artificial Intelligence techniques into a single i
 
 | Member | Role |
 |--------|------|
-| **Tabitha Macharia** | Project Setup + System Integration (app.py) |
+| **Tabitha Macharia** | Team Lead, Repository & Trello Management, Collaborative System Integration (`app.py`) |
 | **Esther Kamau** | Intelligent Agent + Knowledge Base |
 | **Lorna Kyalo** | Neural Network + Network Planner |
 | **Ruth Ndua** | Machine Classifier |
@@ -192,6 +192,11 @@ After pushing your branch, create a Pull Request on GitHub. Once reviewed and ap
 
 ## License
 This project was developed for academic purposes as part of the Artificial Intelligence Capstone Project at Dedan Kimathi University of Technology.
+
+> **Disclaimer:** This project is an academic AI prototype developed for
+> educational purposes. Its outputs are not medical diagnoses or
+> professional treatment advice and should not be used to make real
+> healthcare decisions.
 
 
 
